@@ -5,6 +5,7 @@
  */
 
 import { Redis } from "@upstash/redis";
+import { fetchAtisFromGuru } from "./atis-guru";
 
 const API_BASE = "https://api.airframes.io";
 const PAGES_TO_FETCH = 10;
@@ -250,15 +251,28 @@ async function fetchTargetedAtis(icao: string): Promise<number> {
  */
 export async function fetchAtisForAirport(icao: string): Promise<ParsedAtisMessage[]> {
   // Check cache first
-  const cached = await cacheGetForAirport(icao);
+  let cached = await cacheGetForAirport(icao);
 
-  // Cache miss — trigger targeted search in background (non-blocking)
-  // ATIS will be available on next request after cache is populated
-  if (cached.length === 0) {
-    fetchTargetedAtis(icao).catch(() => {});
+  const hasArr = cached.some(m => m.type === "ARR");
+  const hasDep = cached.some(m => m.type === "DEP");
+
+  // If cache is incomplete (missing ARR or DEP or both), try atis.guru
+  if (!hasArr || !hasDep) {
+    try {
+      const guruMessages = await fetchAtisFromGuru(icao);
+      for (const msg of guruMessages) {
+        await cacheSet(msg);
+      }
+      if (guruMessages.length > 0) {
+        cached = await cacheGetForAirport(icao);
+      }
+    } catch {
+      // atis.guru failed, continue
+    }
   }
 
-  // Broad scan in background (non-blocking, respects cooldown)
+  // Background airframes scan
+  fetchTargetedAtis(icao).catch(() => {});
   scanAndCache().catch(() => {});
 
   return cached;
