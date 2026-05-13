@@ -20,7 +20,7 @@ function today(): string {
   return String(new Date().getUTCDate()).padStart(2, "0");
 }
 
-export function getMockAtis(icao: string): AtisRecord | null {
+export function getMockAtis(icao: string): AtisRecord[] {
   const dd = today();
   const time = utcTime(0.2); // ~12 min ago
 
@@ -30,6 +30,7 @@ export function getMockAtis(icao: string): AtisRecord | null {
       raw: `LFPG ARR ATIS B ${dd}${time}Z RWY 27R 26L TRL FL070 WIND 250/12KT QNH 1018 TEMPO 25015G25KT VIS 9999 FEW040 T14/08 NOSIG`,
       fields: {
         letter: "B",
+        type: null,
         arrivalRunways: ["27R", "26L"],
         departureRunways: ["27R"],
         wind: "250°/12 kt",
@@ -48,6 +49,7 @@ export function getMockAtis(icao: string): AtisRecord | null {
       raw: `LFPB ATIS D ${dd}${utcTime(0.5)}Z RWY 07 TRL FL060 WIND 070/08KT QNH 1019 VIS 9999 SCT035 T12/07`,
       fields: {
         letter: "D",
+        type: null,
         arrivalRunways: ["07"],
         departureRunways: ["07"],
         wind: "070°/08 kt",
@@ -66,6 +68,7 @@ export function getMockAtis(icao: string): AtisRecord | null {
       raw: `EGLL ATIS K ${dd}${utcTime(0.1)}Z RWY 27L ARR 27R DEP TRL FL070 WIND 260/18G28KT QNH 1012 VIS 8000 RA SCT012 BKN020 T09/07 TEMPO 4000 +RA BKN008`,
       fields: {
         letter: "K",
+        type: null,
         arrivalRunways: ["27L"],
         departureRunways: ["27R"],
         wind: "260°/18 kt G28",
@@ -84,6 +87,7 @@ export function getMockAtis(icao: string): AtisRecord | null {
       raw: `EDDF ATIS M ${dd}${utcTime(0.3)}Z RWY 25C ARR 25L DEP TRL FL070 WIND 240/14KT QNH 1015 CAVOK T16/09`,
       fields: {
         letter: "M",
+        type: null,
         arrivalRunways: ["25C"],
         departureRunways: ["25L"],
         wind: "240°/14 kt",
@@ -102,6 +106,7 @@ export function getMockAtis(icao: string): AtisRecord | null {
       raw: `EHAM ATIS R ${dd}${utcTime(0.8)}Z RWY 18R ARR 24 DEP TRL FL040 WIND 190/22G35KT QNH 1008 VIS 5000 -SHRA FEW008CB BKN015 T11/09 TEMPO 2000 +TSRA SCT008CB`,
       fields: {
         letter: "R",
+        type: null,
         arrivalRunways: ["18R"],
         departureRunways: ["24"],
         wind: "190°/22 kt G35",
@@ -117,7 +122,8 @@ export function getMockAtis(icao: string): AtisRecord | null {
     },
   };
 
-  return data[icao.toUpperCase()] ?? null;
+  const record = data[icao.toUpperCase()];
+  return record ? [record] : [];
 }
 
 export function getMockMetar(icao: string): MetarRecord | null {

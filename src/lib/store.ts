@@ -78,9 +78,9 @@ export function liveMessageToAtisRecord(
 ): AtisRecord {
   const body = msg.body;
 
-  // Extract runways
-  const arrRwyMatch = body.match(/(?:LANDING|ARR(?:IVAL)?)\s+RWY\s*(\S+(?:\s*\/\s*\S+)?)/i);
-  const depRwyMatch = body.match(/(?:DEP(?:ARTURE)?)\s+RWY\s*(\S+(?:\s*\/\s*\S+)?)/i);
+  // Extract runways — handles "ARR RWY 27L AND 26L", "ARR RWY 27L/26L", "LANDING RWY 09R"
+  const arrRwyMatch = body.match(/(?:LANDING|ARR(?:IVAL)?)\s+RWY\s*([\w\s\/]+?)(?=\s+DEP|\s+SID|\s*\n|\s*$)/i);
+  const depRwyMatch = body.match(/(?:DEP(?:ARTURE)?)\s+RWY\s*([\w\s\/]+?)(?=\s+ARR|\s+SID|\s*\n|\s*$)/i);
 
   // Extract wind — handles "WIND 250/07 KT", "25007KT", "250/07KT", "WIND 250 07 KT"
   const windMatch =
@@ -129,7 +129,7 @@ export function liveMessageToAtisRecord(
 
   const parseRunways = (s: string | undefined): string[] => {
     if (!s) return [];
-    return s.split(/[\/,\s]+/).filter(r => /^\d{2}[LRC]?$/.test(r));
+    return s.split(/(?:\s+AND\s+|[\/,\s]+)/i).filter(r => /^\d{2}[LRC]?$/.test(r));
   };
 
   let windStr = "N/A";
@@ -145,6 +145,7 @@ export function liveMessageToAtisRecord(
     raw: msg.raw.replace(/\t/g, " ").replace(/\r/g, ""),
     fields: {
       letter: msg.letter,
+      type: msg.type,
       arrivalRunways: parseRunways(arrRwyMatch?.[1]),
       departureRunways: parseRunways(depRwyMatch?.[1]),
       wind: windStr,

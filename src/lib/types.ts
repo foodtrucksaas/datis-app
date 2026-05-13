@@ -9,6 +9,7 @@ export interface Airport {
 /** Parsed key fields extracted from an ATIS message */
 export interface AtisFields {
   letter: string;
+  type: "ARR" | "DEP" | null;
   arrivalRunways: string[];
   departureRunways: string[];
   wind: string;
@@ -46,7 +47,7 @@ export interface TafRecord {
 /** Full data bundle for a given ICAO */
 export interface AirportData {
   airport: Airport;
-  atis: AtisRecord | null;
+  atis: AtisRecord[];
   metar: MetarRecord | null;
   taf: TafRecord | null;
 }

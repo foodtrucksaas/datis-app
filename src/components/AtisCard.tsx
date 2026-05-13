@@ -48,7 +48,7 @@ export function AtisCard({ atis }: AtisCardProps) {
       {/* Letter */}
       <div className="text-center">
         <p className="font-mono text-5xl font-bold tracking-wider text-[var(--accent)]">
-          INFO {fields.letter}
+          {fields.type ? `${fields.type} ` : ""}INFO {fields.letter}
         </p>
         <div className="mt-2 flex items-center justify-center gap-2">
           <FreshnessBadge receivedAt={atis.receivedAt} />

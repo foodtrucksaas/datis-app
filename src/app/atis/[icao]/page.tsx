@@ -48,17 +48,16 @@ export default function AtisPage() {
       : null;
 
     if (liveResponse && liveResponse.messages && liveResponse.messages.length > 0) {
-      // We got live ATIS data
+      // We got live ATIS data — convert all messages (ARR + DEP)
       const airport = liveResponse.airport
         ? liveResponse.airport
         : findAirport(icao) ?? { icao, name: icao, city: "", country: "" };
 
-      const mostRecent = liveResponse.messages[0];
-      const atisRecord = liveMessageToAtisRecord(mostRecent);
+      const atisRecords = liveResponse.messages.map(liveMessageToAtisRecord);
 
       setData({
         airport,
-        atis: atisRecord,
+        atis: atisRecords,
         metar: liveMetar,
         taf: liveTaf,
       });
@@ -71,7 +70,7 @@ export default function AtisPage() {
       if (airport || liveMetar || liveTaf) {
         setData({
           airport: airport ?? { icao, name: icao, city: "", country: "" },
-          atis: null,
+          atis: [],
           metar: liveMetar,
           taf: liveTaf,
         });
@@ -161,7 +160,7 @@ export default function AtisPage() {
 
   if (!data) return null;
 
-  const hasAtis = !!data.atis;
+  const hasAtis = data.atis.length > 0;
 
   return (
     <>
@@ -194,19 +193,19 @@ export default function AtisPage() {
       <AirportHeader airport={data.airport} />
 
       <main className="flex flex-1 flex-col gap-5 pb-4">
-        {/* ATIS Card */}
+        {/* ATIS Cards — one per message (ARR + DEP) */}
         {hasAtis ? (
-          <>
-            <AtisCard atis={data.atis!} />
-
-            {/* Raw ATIS */}
-            <div className="mx-5">
-              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
-                Raw ATIS
-              </h3>
-              <RawDataBlock raw={data.atis!.raw} />
+          data.atis.map((atis, i) => (
+            <div key={i}>
+              <AtisCard atis={atis} />
+              <div className="mx-5 mt-3">
+                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+                  Raw ATIS{atis.fields.type ? ` ${atis.fields.type}` : ""}
+                </h3>
+                <RawDataBlock raw={atis.raw} />
+              </div>
             </div>
-          </>
+          ))
         ) : (
           <div className="mx-5 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-5 text-center">
             <p className="text-sm text-[var(--text-secondary)]">
