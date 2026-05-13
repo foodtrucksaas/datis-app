@@ -34,9 +34,19 @@ function weatherIcon(code: number, cloud: number): string {
   return "☀";
 }
 
-function windArrow(deg: number): string {
-  const arrows = ["↓", "↙", "←", "↖", "↑", "↗", "→", "↘"];
-  return arrows[Math.round(deg / 45) % 8];
+/** SVG wind arrow rotated to exact degree. Points down at 0° (north wind = blows south). */
+function WindArrow({ deg }: { deg: number }) {
+  return (
+    <svg
+      width="12"
+      height="12"
+      viewBox="0 0 12 12"
+      className="inline-block align-middle"
+      style={{ transform: `rotate(${deg}deg)` }}
+    >
+      <path d="M6 1 L9 9 L6 7 L3 9 Z" fill="currentColor" />
+    </svg>
+  );
 }
 
 /** Temperature gradient: blue (cold) → green → yellow → orange → red (hot) */
@@ -237,7 +247,7 @@ export function Meteogram({ lat, lon }: MeteogramProps) {
                   className={`${cell} font-bold`}
                   style={{ backgroundColor: windBg(h.wind) }}
                 >
-                  <span className="opacity-60 mr-0.5">{windArrow(h.windDir)}</span>
+                  <span className="opacity-60 mr-0.5"><WindArrow deg={h.windDir} /></span>
                   {h.wind}
                 </td>
               ))}
