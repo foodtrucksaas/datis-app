@@ -110,14 +110,20 @@ function cacheKey(icao: string, type: string): string {
 
 /** Should we replace existing cached message with the new one? */
 function shouldReplace(existing: ParsedAtisMessage, incoming: ParsedAtisMessage): boolean {
-  // Different letter = newer ATIS revision, compare by timestamp
+  // Different letter = newer ATIS revision — later letter wins (W > V)
+  // Handle wrap-around: if letters are far apart (e.g. A vs Z), A is newer
   if (existing.letter !== incoming.letter) {
-    return new Date(incoming.timestamp) > new Date(existing.timestamp);
+    const diff = incoming.letter.charCodeAt(0) - existing.letter.charCodeAt(0);
+    // Positive diff (and not a huge wrap-around gap) = incoming is newer
+    if (diff > 0 && diff < 13) return true;
+    // Negative diff (and wrap-around) = incoming wrapped past Z→A
+    if (diff < -13) return true;
+    return false;
   }
   // Same letter = same ATIS, prefer longer body (complete vs truncated)
   if (incoming.body.length > existing.body.length) return true;
-  // Same length or shorter, prefer newer
-  return new Date(incoming.timestamp) > new Date(existing.timestamp);
+  // Same length or shorter, keep existing
+  return false;
 }
 
 async function cacheSet(msg: ParsedAtisMessage): Promise<void> {

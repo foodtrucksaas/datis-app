@@ -42,6 +42,8 @@ export async function fetchAtisFromGuru(icao: string): Promise<ParsedAtisMessage
         .replace(/<\/div>/, "")
         .replace(/&#xA;/g, "\n")
         .replace(/&#xD;/g, "")
+        .replace(/&#x9;/g, "\t")
+        .replace(/&#\w+;/g, "")
         .trim();
 
       // Match ATIS pattern: ICAO ARR|DEP ATIS LETTER
