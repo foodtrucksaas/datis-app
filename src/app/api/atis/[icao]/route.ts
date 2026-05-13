@@ -29,9 +29,10 @@ export async function GET(
       fetchedAt: new Date().toISOString(),
     });
   } catch (error) {
-    console.error(`Error fetching ATIS for ${upperIcao}:`, error);
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`Error fetching ATIS for ${upperIcao}:`, message);
     return NextResponse.json(
-      { error: "Failed to fetch ATIS data", icao: upperIcao },
+      { error: "Failed to fetch ATIS data", detail: message, icao: upperIcao },
       { status: 502 }
     );
   }
