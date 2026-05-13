@@ -9,8 +9,8 @@ import { fetchAtisFromGuru } from "./atis-guru";
 
 const API_BASE = "https://api.airframes.io";
 const PAGES_TO_FETCH = 10;
-const CACHE_TTL_SECONDS = 12 * 60 * 60; // 12 hours
-const SCAN_COOLDOWN_MS = 60_000; // 1 min between scans
+const CACHE_TTL_SECONDS = 7 * 24 * 60 * 60; // 7 days
+const SCAN_COOLDOWN_MS = 0; // no cooldown — QStash controls the schedule
 
 // ---------------------------------------------------------------------------
 // Redis client (lazy init to avoid errors when env vars missing in dev)
