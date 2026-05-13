@@ -242,10 +242,8 @@ export async function fetchAtisForAirport(icao: string): Promise<ParsedAtisMessa
   // Check cache first
   let cached = await cacheGetForAirport(icao);
 
-  // If we don't have both ARR and DEP, do a targeted search
-  const hasArr = cached.some(m => m.type === "ARR");
-  const hasDep = cached.some(m => m.type === "DEP");
-  if (!hasArr || !hasDep) {
+  // Cache miss — targeted search to find ATIS for this airport
+  if (cached.length === 0) {
     await fetchTargetedAtis(icao);
     cached = await cacheGetForAirport(icao);
   }
