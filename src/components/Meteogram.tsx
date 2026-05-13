@@ -88,27 +88,46 @@ export function Meteogram({ lat, lon }: MeteogramProps) {
       .then((r) => r.json())
       .then((d) => {
         const h = d.hourly;
-        const data: HourData[] = h.time.map((t: string, i: number) => ({
-          time: t,
-          hour: t.slice(11, 13),
-          temp: Math.round(h.temperature_2m[i]),
-          dewpoint: Math.round(h.dewpoint_2m[i]),
-          wind: Math.round(h.wind_speed_10m[i]),
-          gusts: Math.round(h.wind_gusts_10m[i]),
-          windDir: h.wind_direction_10m[i],
-          qnh: Math.round(h.pressure_msl[i]),
-          cloud: h.cloud_cover[i],
-          precip: h.precipitation[i],
-          weatherCode: h.weather_code[i],
-        }));
+        const len = h.time.length;
 
-        // Every 3 hours starting from current hour
+        // Find start index: nearest 3h-aligned hour from now
         const nowHour = new Date().getUTCHours();
-        const nowIdx = data.findIndex((d) => parseInt(d.hour) >= nowHour);
-        const start = Math.max(0, nowIdx);
-        setHours(
-          data.filter((_, i) => i >= start && (i - start) % 3 === 0).slice(0, 16)
-        );
+        const rawStart = h.time.findIndex((_: string, i: number) => {
+          const hr = parseInt(h.time[i].slice(11, 13));
+          return hr >= nowHour;
+        });
+        const start = Math.max(0, rawStart);
+
+        // Aggregate every 3 hours: max wind/gusts over window, sum precip
+        const aggregated: HourData[] = [];
+        for (let i = start; i < len && aggregated.length < 16; i += 3) {
+          // Look at the 3h window [i, i+1, i+2] for max/sum
+          const end = Math.min(i + 3, len);
+          let maxWind = 0, maxGusts = 0, totalPrecip = 0;
+          let maxWindIdx = i;
+          for (let j = i; j < end; j++) {
+            const w = h.wind_speed_10m[j] ?? 0;
+            const g = h.wind_gusts_10m[j] ?? 0;
+            if (w > maxWind) { maxWind = w; maxWindIdx = j; }
+            if (g > maxGusts) maxGusts = g;
+            totalPrecip += h.precipitation[j] ?? 0;
+          }
+          aggregated.push({
+            time: h.time[i],
+            hour: h.time[i].slice(11, 13),
+            temp: Math.round(h.temperature_2m[i]),
+            dewpoint: Math.round(h.dewpoint_2m[i]),
+            wind: Math.round(maxWind),
+            gusts: Math.round(maxGusts),
+            windDir: h.wind_direction_10m[maxWindIdx],
+            qnh: Math.round(h.pressure_msl[i]),
+            cloud: h.cloud_cover[i],
+            precip: Math.round(totalPrecip * 10) / 10,
+            weatherCode: h.weather_code[i],
+          });
+        }
+
+        setHours(aggregated);
         setLoading(false);
       })
       .catch(() => setLoading(false));
