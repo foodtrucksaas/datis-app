@@ -80,16 +80,23 @@ export function liveMessageToAtisRecord(
 
   // Extract runways — handles many formats:
   // "ARR RWY 27L AND 26L", "RWY IN USE 22L", "LANDING RWY 09R", "DEP RWY 27L"
+  // "RWY 35L FOR LANDING", "RWY 35R FOR TAKEOFF/DEP"
   const rwyInUseMatch = body.match(/RWY\s+IN\s+USE\s*([\w\s\/]+?)(?=\s*\n|\s*$)/im);
+  const rwyForLanding = body.match(/RWY\s+([\d]{2}[LRC]?)\s+FOR\s+LAND/i);
+  const rwyForTakeoff = body.match(/RWY\s+([\d]{2}[LRC]?)\s+FOR\s+(?:TAKE\s*OFF|DEP)/i);
   const arrRwyMatch =
     body.match(/(?:LANDING|ARR(?:IVAL)?)\s+RWY\s*([\w\s]+?)(?=\s*[\/\s]DEP|\s+SID|\s*\n|\s*$)/i) ||
+    body.match(/(?:LDG)\s+RWY\s*([\w\s]+?)(?=\s*[\/\s]DEP|\s+SID|\s*\n|\s*$)/i) ||
+    rwyForLanding ||
     (msg.type === "ARR" ? rwyInUseMatch : null);
   const depRwyMatch =
     body.match(/(?:[\/\s]DEP(?:ARTURE)?)\s+RWY\s*([\w\s]+?)(?=\s*[\/\s]ARR|\s+SID|\s*[\/]|\s*\n|\s*$)/i) ||
     body.match(/(?:DEP(?:ARTURE)?)\s+RWY\s*([\w\s]+?)(?=\s*[\/\s]ARR|\s+SID|\s*[\/]|\s*\n|\s*$)/i) ||
+    rwyForTakeoff ||
     (msg.type === "DEP" ? rwyInUseMatch : null);
 
-  // Extract wind — handles "WIND 250/07 KT", "WIND 150 4 KT", "25007KT", "250/07KT"
+  // Extract wind — handles "WIND 250/07 KT", "WIND 150 4 KT", "25007KT", "250/07KT", "VRB/ 05KT", "VRB 3KT"
+  const vrbMatch = body.match(/VRB\s*\/?\s*(\d{1,3})\s*(G\s*(\d{1,3}))?\s*KT/i);
   const windMatch =
     body.match(/WIND\s+(\d{3})\s*[\/]?\s*(\d{1,3})\s*(G\s*(\d{1,3}))?\s*KT/i) ||
     body.match(/(\d{3})(\d{2,3})(G(\d{2,3}))?KT/);
@@ -104,7 +111,7 @@ export function liveMessageToAtisRecord(
     visibility = "CAVOK";
   } else {
     const visKmMatch = body.match(/VIS\s+(\d+)\s*KM/i);
-    const visMetersMatch = body.match(/VIS\s+(\d{4})/i);
+    const visMetersMatch = body.match(/VIS\s+(\d{4})\s*M?(?:\s|$)/i);
     if (visKmMatch) {
       visibility = `${visKmMatch[1]} km`;
     } else if (visMetersMatch) {
@@ -137,7 +144,11 @@ export function liveMessageToAtisRecord(
   };
 
   let windStr = "N/A";
-  if (windMatch) {
+  if (vrbMatch) {
+    const spd = vrbMatch[1];
+    const gust = vrbMatch[3];
+    windStr = `VRB ${parseInt(spd)} kt${gust ? ` G${parseInt(gust)}` : ""}`;
+  } else if (windMatch) {
     const dir = windMatch[1];
     const spd = windMatch[2];
     const gust = windMatch[4];
