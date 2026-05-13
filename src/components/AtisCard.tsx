@@ -42,6 +42,9 @@ function windColor(wind: string): string | undefined {
 export function AtisCard({ atis }: AtisCardProps) {
   const [remarksOpen, setRemarksOpen] = useState(false);
   const { fields } = atis;
+  const isDep = fields.type === "DEP";
+  const primaryRunways = isDep ? fields.departureRunways : fields.arrivalRunways;
+  const secondaryRunways = isDep ? fields.arrivalRunways : fields.departureRunways;
 
   return (
     <div className="mx-5 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-5">
@@ -62,15 +65,15 @@ export function AtisCard({ atis }: AtisCardProps) {
       {/* 2x2 grid */}
       <div className="mt-5 grid grid-cols-2 gap-2.5">
         <MetricTile
-          label="Arrivée"
-          value={fields.arrivalRunways.join(" · ")}
+          label={isDep ? "Départ" : "Arrivée"}
+          value={primaryRunways.join(" · ")}
         />
         <MetricTile
           label="Vent"
           value={fields.wind}
           valueColor={windColor(fields.wind)}
         />
-        <MetricTile label="QNH" value={`${fields.qnh} hPa`} />
+        <MetricTile label="QNH" value={fields.qnh ? `${fields.qnh} hPa` : "N/A"} />
         <MetricTile
           label="Visibilité"
           value={fields.visibility}
@@ -80,10 +83,14 @@ export function AtisCard({ atis }: AtisCardProps) {
 
       {/* Secondary info */}
       <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 px-1 text-xs text-[var(--text-muted)]">
-        <span>
-          DEP {fields.departureRunways.join(" · ")}
-        </span>
-        <span>TRL {fields.transitionLevel}</span>
+        {secondaryRunways.length > 0 && (
+          <span>
+            {isDep ? "ARR" : "DEP"} {secondaryRunways.join(" · ")}
+          </span>
+        )}
+        {fields.transitionLevel !== "N/A" && (
+          <span>TRL {fields.transitionLevel}</span>
+        )}
         {fields.temperature !== null && fields.dewpoint !== null && (
           <span>
             {fields.temperature}°C / {fields.dewpoint}°C
