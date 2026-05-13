@@ -82,10 +82,11 @@ export function liveMessageToAtisRecord(
   // "ARR RWY 27L AND 26L", "RWY IN USE 22L", "LANDING RWY 09R", "DEP RWY 27L"
   const rwyInUseMatch = body.match(/RWY\s+IN\s+USE\s*([\w\s\/]+?)(?=\s*\n|\s*$)/im);
   const arrRwyMatch =
-    body.match(/(?:LANDING|ARR(?:IVAL)?)\s+RWY\s*([\w\s\/]+?)(?=\s+DEP|\s+SID|\s*\n|\s*$)/i) ||
+    body.match(/(?:LANDING|ARR(?:IVAL)?)\s+RWY\s*([\w\s]+?)(?=\s*[\/\s]DEP|\s+SID|\s*\n|\s*$)/i) ||
     (msg.type === "ARR" ? rwyInUseMatch : null);
   const depRwyMatch =
-    body.match(/(?:DEP(?:ARTURE)?)\s+RWY\s*([\w\s\/]+?)(?=\s+ARR|\s+SID|\s*\n|\s*$)/i) ||
+    body.match(/(?:[\/\s]DEP(?:ARTURE)?)\s+RWY\s*([\w\s]+?)(?=\s*[\/\s]ARR|\s+SID|\s*[\/]|\s*\n|\s*$)/i) ||
+    body.match(/(?:DEP(?:ARTURE)?)\s+RWY\s*([\w\s]+?)(?=\s*[\/\s]ARR|\s+SID|\s*[\/]|\s*\n|\s*$)/i) ||
     (msg.type === "DEP" ? rwyInUseMatch : null);
 
   // Extract wind — handles "WIND 250/07 KT", "WIND 150 4 KT", "25007KT", "250/07KT"
@@ -97,20 +98,17 @@ export function liveMessageToAtisRecord(
   const qnhMatch = body.match(/QNH\s*(\d{3,4})/i) || body.match(/Q(\d{4})/i);
 
   // Extract visibility — handles "CAVOK", "VIS 10KM", "VIS 8000", "9999"
+  // Exclude raw 4-digit fallback — too many false positives (RSCD timestamps, codes)
   let visibility = "N/A";
   if (/CAVOK/i.test(body)) {
     visibility = "CAVOK";
   } else {
     const visKmMatch = body.match(/VIS\s+(\d+)\s*KM/i);
     const visMetersMatch = body.match(/VIS\s+(\d{4})/i);
-    const rawVisMatch = body.match(/\b(\d{4})\b(?!\d)/);
     if (visKmMatch) {
       visibility = `${visKmMatch[1]} km`;
     } else if (visMetersMatch) {
       const m = parseInt(visMetersMatch[1]);
-      visibility = m === 9999 ? "10 km+" : `${m} m`;
-    } else if (rawVisMatch && parseInt(rawVisMatch[1]) <= 9999) {
-      const m = parseInt(rawVisMatch[1]);
       visibility = m === 9999 ? "10 km+" : `${m} m`;
     }
   }
