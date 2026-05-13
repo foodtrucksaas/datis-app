@@ -206,30 +206,21 @@ async function fetchTargetedAtis(icao: string): Promise<number> {
   targetedCooldowns.set(upper, now);
 
   let ingested = 0;
-  let foundArr = false;
-  let foundDep = false;
 
   try {
-    // Scan ATIS feed page by page until we find both ARR+DEP for this ICAO
-    // or exhaust 2000 messages (20 pages)
-    for (let page = 0; page < 20 && (!foundArr || !foundDep); page++) {
-      const messages = await fetchMessages({
-        text: "ATIS",
-        limit: "100",
-        offset: String(page * 100),
-      });
-      if (messages.length === 0) break;
+    // Fetch 500 ATIS messages in parallel (5 pages)
+    const batches = await Promise.all(
+      Array.from({ length: 5 }, (_, i) =>
+        fetchMessages({ text: "ATIS", limit: "100", offset: String(i * 100) })
+      )
+    );
 
-      for (const msg of messages) {
-        if (!msg.text) continue;
-        const parsed = parseAtisText(msg.text, msg.timestamp);
-        if (!parsed) continue;
-        // Cache everything we find along the way
-        await cacheSet(parsed);
-        ingested++;
-        if (parsed.icao === upper && parsed.type === "ARR") foundArr = true;
-        if (parsed.icao === upper && parsed.type === "DEP") foundDep = true;
-      }
+    for (const msg of batches.flat()) {
+      if (!msg.text) continue;
+      const parsed = parseAtisText(msg.text, msg.timestamp);
+      if (!parsed) continue;
+      await cacheSet(parsed);
+      ingested++;
     }
   } catch (err) {
     console.error(`Targeted ATIS fetch error for ${upper}:`, err);
