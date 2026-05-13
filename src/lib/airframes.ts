@@ -250,12 +250,12 @@ async function fetchTargetedAtis(icao: string): Promise<number> {
  */
 export async function fetchAtisForAirport(icao: string): Promise<ParsedAtisMessage[]> {
   // Check cache first
-  let cached = await cacheGetForAirport(icao);
+  const cached = await cacheGetForAirport(icao);
 
-  // Cache miss — targeted search to find ATIS for this airport
+  // Cache miss — trigger targeted search in background (non-blocking)
+  // ATIS will be available on next request after cache is populated
   if (cached.length === 0) {
-    await fetchTargetedAtis(icao);
-    cached = await cacheGetForAirport(icao);
+    fetchTargetedAtis(icao).catch(() => {});
   }
 
   // Broad scan in background (non-blocking, respects cooldown)
