@@ -10,13 +10,6 @@ interface AtisCardProps {
   atis: AtisRecord;
 }
 
-function formatUtcTime(isoDate: string): string {
-  const d = new Date(isoDate);
-  const hh = String(d.getUTCHours()).padStart(2, "0");
-  const mm = String(d.getUTCMinutes()).padStart(2, "0");
-  return `${hh}${mm}Z`;
-}
-
 function visibilityColor(vis: string): string | undefined {
   if (vis === "CAVOK") return "var(--fresh)";
   const match = vis.match(/^(\d+)/);
@@ -53,12 +46,8 @@ export function AtisCard({ atis }: AtisCardProps) {
         <p className="font-mono text-5xl font-bold tracking-wider text-[var(--accent)]">
           {fields.type ? `${fields.type} ` : ""}INFO {fields.letter}
         </p>
-        <div className="mt-2 flex items-center justify-center gap-2">
+        <div className="mt-2 flex items-center justify-center">
           <FreshnessBadge receivedAt={atis.receivedAt} />
-          <span className="text-sm text-[var(--text-muted)]">·</span>
-          <span className="font-mono text-sm text-[var(--text-secondary)]">
-            {formatUtcTime(atis.emittedAt)}
-          </span>
         </div>
       </div>
 

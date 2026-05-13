@@ -1,28 +1,50 @@
+import { AlertTriangle } from "lucide-react";
+
 interface FreshnessBadgeProps {
   receivedAt: string;
 }
 
 function getAge(isoDate: string): { minutes: number; label: string } {
   const ms = Date.now() - new Date(isoDate).getTime();
-  const minutes = Math.round(ms / 60_000);
+  const totalMin = Math.max(0, Math.round(ms / 60_000));
 
-  if (minutes < 1) return { minutes, label: "à l'instant" };
-  if (minutes < 60) return { minutes, label: `il y a ${minutes} min` };
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return { minutes, label: `il y a ${hours}h${minutes % 60 > 0 ? String(minutes % 60).padStart(2, "0") : ""}` };
-  return { minutes, label: `il y a ${Math.floor(hours / 24)}j` };
+  if (totalMin < 1) return { minutes: totalMin, label: "à l'instant" };
+
+  const days = Math.floor(totalMin / 1440);
+  const hours = Math.floor((totalMin % 1440) / 60);
+  const mins = totalMin % 60;
+
+  let label = "il y a ";
+  if (days > 0) label += `${days}j `;
+  if (hours > 0) label += `${hours}h`;
+  if (days === 0 && mins > 0) label += `${mins.toString().padStart(2, "0")}min`;
+
+  return { minutes: totalMin, label: label.trim() };
 }
 
-function getFreshnessColor(minutes: number): string {
-  if (minutes <= 15) return "var(--fresh)";
-  if (minutes <= 45) return "var(--warm)";
-  if (minutes <= 120) return "var(--stale)";
-  return "var(--cold)";
+type Freshness = "fresh" | "warm" | "stale" | "cold";
+
+function getFreshness(minutes: number): Freshness {
+  if (minutes <= 30) return "fresh";
+  if (minutes <= 90) return "warm";
+  if (minutes <= 240) return "stale";
+  return "cold";
+}
+
+function getFreshnessColor(f: Freshness): string {
+  switch (f) {
+    case "fresh": return "var(--fresh)";
+    case "warm": return "var(--warm)";
+    case "stale": return "var(--stale)";
+    case "cold": return "var(--cold)";
+  }
 }
 
 export function FreshnessBadge({ receivedAt }: FreshnessBadgeProps) {
   const { minutes, label } = getAge(receivedAt);
-  const color = getFreshnessColor(minutes);
+  const freshness = getFreshness(minutes);
+  const color = getFreshnessColor(freshness);
+  const isOld = freshness === "stale" || freshness === "cold";
 
   return (
     <span className="inline-flex items-center gap-1.5 text-sm text-[var(--text-secondary)]">
@@ -30,14 +52,17 @@ export function FreshnessBadge({ receivedAt }: FreshnessBadgeProps) {
         className="inline-block h-2 w-2 rounded-full"
         style={{ backgroundColor: color }}
       />
-      {label}
+      <span style={isOld ? { color } : undefined}>{label}</span>
+      {isOld && (
+        <AlertTriangle className="h-3.5 w-3.5" style={{ color }} />
+      )}
     </span>
   );
 }
 
 export function FreshnessInline({ receivedAt }: FreshnessBadgeProps) {
   const { minutes, label } = getAge(receivedAt);
-  const color = getFreshnessColor(minutes);
+  const color = getFreshnessColor(getFreshness(minutes));
 
   return (
     <span className="inline-flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
