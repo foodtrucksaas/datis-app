@@ -87,8 +87,9 @@ function precipBg(mm: number): string {
 }
 
 export function Meteogram({ lat, lon }: MeteogramProps) {
-  const [hours, setHours] = useState<HourData[]>([]);
+  const [rawData, setRawData] = useState<HourData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [step, setStep] = useState<1 | 3>(3);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -98,52 +99,58 @@ export function Meteogram({ lat, lon }: MeteogramProps) {
       .then((r) => r.json())
       .then((d) => {
         const h = d.hourly;
-        const len = h.time.length;
-
-        // Find start index: nearest 3h-aligned hour from now
         const nowHour = new Date().getUTCHours();
-        const rawStart = h.time.findIndex((_: string, i: number) => {
-          const hr = parseInt(h.time[i].slice(11, 13));
-          return hr >= nowHour;
-        });
-        const start = Math.max(0, rawStart);
-
-        // Aggregate every 3 hours: max wind/gusts over window, sum precip
-        const aggregated: HourData[] = [];
-        for (let i = start; i < len && aggregated.length < 16; i += 3) {
-          // Look at the 3h window [i, i+1, i+2] for max/sum
-          const end = Math.min(i + 3, len);
-          let maxWind = 0, maxGusts = 0, totalPrecip = 0;
-          let maxWindIdx = i;
-          for (let j = i; j < end; j++) {
-            const w = h.wind_speed_10m[j] ?? 0;
-            const g = h.wind_gusts_10m[j] ?? 0;
-            if (w > maxWind) { maxWind = w; maxWindIdx = j; }
-            if (g > maxGusts) maxGusts = g;
-            totalPrecip += h.precipitation[j] ?? 0;
-          }
-          aggregated.push({
+        const startIdx = Math.max(0, h.time.findIndex((_: string, i: number) =>
+          parseInt(h.time[i].slice(11, 13)) >= nowHour
+        ));
+        const all: HourData[] = [];
+        for (let i = startIdx; i < h.time.length; i++) {
+          all.push({
             time: h.time[i],
             hour: h.time[i].slice(11, 13),
             temp: Math.round(h.temperature_2m[i]),
             dewpoint: Math.round(h.dewpoint_2m[i]),
-            wind: Math.round(maxWind),
-            gusts: Math.round(maxGusts),
-            windDir: h.wind_direction_10m[maxWindIdx],
+            wind: Math.round(h.wind_speed_10m[i] ?? 0),
+            gusts: Math.round(h.wind_gusts_10m[i] ?? 0),
+            windDir: h.wind_direction_10m[i],
             qnh: Math.round(h.pressure_msl[i]),
             cloud: h.cloud_cover[i],
-            precip: Math.round(totalPrecip * 10) / 10,
+            precip: Math.round((h.precipitation[i] ?? 0) * 10) / 10,
             weatherCode: h.weather_code[i],
           });
         }
-
-        setHours(aggregated);
+        setRawData(all);
         setLoading(false);
       })
       .catch(() => setLoading(false));
   }, [lat, lon]);
 
-  if (loading || hours.length === 0) return null;
+  if (loading || rawData.length === 0) return null;
+
+  // Build display data based on step
+  let hours: HourData[];
+  if (step === 1) {
+    hours = rawData.slice(0, 48);
+  } else {
+    const aggregated: HourData[] = [];
+    for (let i = 0; i < rawData.length && aggregated.length < 16; i += 3) {
+      const end = Math.min(i + 3, rawData.length);
+      let maxWind = 0, maxGusts = 0, totalPrecip = 0, maxWindIdx = i;
+      for (let j = i; j < end; j++) {
+        if (rawData[j].wind > maxWind) { maxWind = rawData[j].wind; maxWindIdx = j; }
+        if (rawData[j].gusts > maxGusts) maxGusts = rawData[j].gusts;
+        totalPrecip += rawData[j].precip;
+      }
+      aggregated.push({
+        ...rawData[i],
+        wind: maxWind,
+        gusts: maxGusts,
+        windDir: rawData[maxWindIdx].windDir,
+        precip: Math.round(totalPrecip * 10) / 10,
+      });
+    }
+    hours = aggregated;
+  }
 
   // Group hours by day
   const days: { label: string; count: number }[] = [];
@@ -171,9 +178,25 @@ export function Meteogram({ lat, lon }: MeteogramProps) {
 
   return (
     <div className="mx-5">
-      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
-        Météogramme · ECMWF
-      </h3>
+      <div className="mb-2 flex items-center justify-between">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+          Météogramme · ECMWF
+        </h3>
+        <div className="flex rounded-md border border-[var(--border)] overflow-hidden text-[10px] font-medium">
+          <button
+            onClick={() => setStep(1)}
+            className={`px-2 py-0.5 transition-colors ${step === 1 ? "bg-[var(--accent)] text-white" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"}`}
+          >
+            1h
+          </button>
+          <button
+            onClick={() => setStep(3)}
+            className={`px-2 py-0.5 transition-colors ${step === 3 ? "bg-[var(--accent)] text-white" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"}`}
+          >
+            3h
+          </button>
+        </div>
+      </div>
       <div
         ref={scrollRef}
         className="overflow-x-auto rounded-lg border border-[var(--border)] bg-[var(--surface)]"
