@@ -192,16 +192,59 @@ async function scanAndCache(): Promise<number> {
 }
 
 // ---------------------------------------------------------------------------
+// Targeted fetch for a specific airport
+// ---------------------------------------------------------------------------
+
+const targetedCooldowns = new Map<string, number>();
+const TARGETED_COOLDOWN_MS = 60_000;
+
+async function fetchTargetedAtis(icao: string): Promise<number> {
+  const upper = icao.toUpperCase();
+  const now = Date.now();
+  const last = targetedCooldowns.get(upper) ?? 0;
+  if (now - last < TARGETED_COOLDOWN_MS) return 0;
+  targetedCooldowns.set(upper, now);
+
+  let ingested = 0;
+  try {
+    // Search airframes specifically for this ICAO
+    const messages = await fetchMessages({ text: upper, limit: "100" });
+    for (const msg of messages) {
+      if (!msg.text) continue;
+      const parsed = parseAtisText(msg.text, msg.timestamp);
+      if (parsed && parsed.icao === upper) {
+        await cacheSet(parsed);
+        ingested++;
+      }
+    }
+  } catch (err) {
+    console.error(`Targeted ATIS fetch error for ${upper}:`, err);
+  }
+  return ingested;
+}
+
+// ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
 /**
- * Fetch ATIS for an airport. Triggers a background scan, then reads from cache.
+ * Fetch ATIS for an airport.
+ * 1. Check cache first
+ * 2. If empty, do a targeted search on airframes for this specific ICAO
+ * 3. Also trigger the broad scan in background (non-blocking)
  */
 export async function fetchAtisForAirport(icao: string): Promise<ParsedAtisMessage[]> {
-  // Fire scan (non-blocking if cooldown active)
-  await scanAndCache();
-  return cacheGetForAirport(icao);
+  // Broad scan in background (non-blocking, respects cooldown)
+  scanAndCache().catch(() => {});
+
+  // Check cache
+  let cached = await cacheGetForAirport(icao);
+  if (cached.length > 0) return cached;
+
+  // Cache miss — targeted fetch for this specific airport
+  await fetchTargetedAtis(icao);
+  cached = await cacheGetForAirport(icao);
+  return cached;
 }
 
 /**
