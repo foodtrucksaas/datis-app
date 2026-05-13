@@ -176,8 +176,6 @@ async function scanAndCache(): Promise<number> {
   if (now - lastScanAt < SCAN_COOLDOWN_MS) return 0;
   lastScanAt = now;
 
-  let ingested = 0;
-
   try {
     // Fetch in 2 parallel batches of 5
     const batch1 = await Promise.all(
@@ -191,21 +189,31 @@ async function scanAndCache(): Promise<number> {
       )
     );
 
-    const allMessages = [...batch1.flat(), ...batch2.flat()];
-
-    for (const msg of allMessages) {
+    // Deduplicate in memory first: keep best message per ICAO+TYPE
+    // This reduces Redis calls from ~700 to ~50-100 unique airports
+    const best = new Map<string, ParsedAtisMessage>();
+    for (const msg of [...batch1.flat(), ...batch2.flat()]) {
       if (!msg.text) continue;
       const parsed = parseAtisText(msg.text, msg.timestamp);
-      if (parsed) {
-        await cacheSet(parsed);
-        ingested++;
+      if (!parsed) continue;
+      const key = `${parsed.icao}:${parsed.type}`;
+      const existing = best.get(key);
+      if (!existing || shouldReplace(existing, parsed)) {
+        best.set(key, parsed);
       }
     }
+
+    // Now write only the best per airport to Redis (~1 GET + 1 SET each)
+    let ingested = 0;
+    for (const msg of best.values()) {
+      await cacheSet(msg);
+      ingested++;
+    }
+    return ingested;
   } catch (err) {
     console.error("Airframes scan error:", err);
+    return 0;
   }
-
-  return ingested;
 }
 
 // ---------------------------------------------------------------------------
