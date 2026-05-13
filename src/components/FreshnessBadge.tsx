@@ -65,7 +65,7 @@ export function FreshnessBadge({ receivedAt }: FreshnessBadgeProps) {
         className="inline-block h-2 w-2 rounded-full"
         style={{ backgroundColor: color }}
       />
-      <span style={isOld ? { color } : undefined}>{label}</span>
+      <span style={isOld ? { color } : undefined}>Reçu {label}</span>
       <button
         onClick={() => setTooltipOpen(!tooltipOpen)}
         className="inline-flex items-center justify-center rounded-full hover:text-[var(--text-primary)] transition-colors"
