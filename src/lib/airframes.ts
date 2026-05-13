@@ -1,13 +1,36 @@
 /**
- * Airframes.io API client.
- * Fetches D-ATIS messages, parses them, and maintains a server-side cache
- * that accumulates over time for better coverage.
- * Runs server-side only (uses AIRFRAMES_API_KEY env var).
+ * Airframes.io API client with Upstash Redis persistent cache.
+ * Each ATIS message is stored in Redis with a 12h TTL.
+ * Scans are throttled to once per minute.
  */
 
+import { Redis } from "@upstash/redis";
+
 const API_BASE = "https://api.airframes.io";
-const PAGES_TO_FETCH = 10; // 10 × 100 = 1000 messages per scan
-const CACHE_MAX_AGE_MS = 6 * 60 * 60 * 1000; // discard entries older than 6h
+const PAGES_TO_FETCH = 10;
+const CACHE_TTL_SECONDS = 12 * 60 * 60; // 12 hours
+const SCAN_COOLDOWN_MS = 60_000; // 1 min between scans
+
+// ---------------------------------------------------------------------------
+// Redis client (lazy init to avoid errors when env vars missing in dev)
+// ---------------------------------------------------------------------------
+let redis: Redis | null = null;
+
+function getRedis(): Redis | null {
+  if (redis) return redis;
+  const url = process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  if (!url || !token) return null;
+  redis = new Redis({ url, token });
+  return redis;
+}
+
+// In-memory fallback when Redis is not available (local dev without Upstash)
+const memoryCache = new Map<string, ParsedAtisMessage>();
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 
 interface AirframesMessage {
   id: number;
@@ -28,12 +51,8 @@ export interface ParsedAtisMessage {
 }
 
 // ---------------------------------------------------------------------------
-// In-memory cache — survives across requests within the same server instance.
-// Key: "ICAO_TYPE" (e.g. "EGLL_ARR"), Value: most recent ParsedAtisMessage
+// Airframes API
 // ---------------------------------------------------------------------------
-const atisCache = new Map<string, ParsedAtisMessage>();
-let lastScanAt = 0;
-const MIN_SCAN_INTERVAL_MS = 60_000; // don't re-scan more than once per minute
 
 async function fetchMessages(params: Record<string, string>): Promise<AirframesMessage[]> {
   const key = process.env.AIRFRAMES_API_KEY;
@@ -56,10 +75,6 @@ async function fetchMessages(params: Record<string, string>): Promise<AirframesM
   return res.json();
 }
 
-/**
- * Parse the TI2 message format:
- * /STATION.TI2/ICAO ARR|DEP ATIS LETTER\n<body>
- */
 function parseAtisText(text: string, timestamp: string): ParsedAtisMessage | null {
   const match = text.match(/\/([A-Z]{4})\s+(ARR|DEP)\s+ATIS\s+([A-Z])/);
   if (!match) return null;
@@ -68,58 +83,91 @@ function parseAtisText(text: string, timestamp: string): ParsedAtisMessage | nul
   const type = match[2] as "ARR" | "DEP";
   const letter = match[3];
 
-  // Find the position right after "ATIS X" in the matched portion
   const fullMatch = match[0];
   const matchIndex = text.indexOf(fullMatch);
   const bodyStart = matchIndex + fullMatch.length;
-  const body = text.slice(bodyStart).trim();
-
-  const cleaned = body
+  const body = text
+    .slice(bodyStart)
+    .trim()
     .replace(/\t/g, " ")
     .replace(/\r\n/g, "\n")
     .replace(/\r/g, "\n")
-    .replace(/[A-F0-9]{4}\s*$/, "") // remove 4-char hex checksum at end
+    .replace(/[A-F0-9]{4}\s*$/, "")
     .trim();
 
-  return { icao, type, letter, body: cleaned, timestamp, raw: text };
+  return { icao, type, letter, body, timestamp, raw: text };
 }
 
-/** Evict entries older than CACHE_MAX_AGE_MS */
-function pruneCache() {
-  const cutoff = Date.now() - CACHE_MAX_AGE_MS;
-  for (const [key, msg] of atisCache) {
-    if (new Date(msg.timestamp).getTime() < cutoff) {
-      atisCache.delete(key);
-    }
+// ---------------------------------------------------------------------------
+// Cache operations
+// ---------------------------------------------------------------------------
+
+/** Redis key format: atis:ICAO:TYPE (e.g. atis:EGLL:ARR) */
+function cacheKey(icao: string, type: string): string {
+  return `atis:${icao}:${type}`;
+}
+
+async function cacheSet(msg: ParsedAtisMessage): Promise<void> {
+  const r = getRedis();
+  const key = cacheKey(msg.icao, msg.type);
+
+  if (r) {
+    // Only update if newer than existing
+    const existing = await r.get<ParsedAtisMessage>(key);
+    if (existing && new Date(existing.timestamp) >= new Date(msg.timestamp)) return;
+    await r.set(key, msg, { ex: CACHE_TTL_SECONDS });
+  } else {
+    // Memory fallback
+    const existing = memoryCache.get(key);
+    if (existing && new Date(existing.timestamp) >= new Date(msg.timestamp)) return;
+    memoryCache.set(key, msg);
   }
 }
 
-/** Ingest a parsed message into the cache if newer than existing entry */
-function ingestToCache(msg: ParsedAtisMessage) {
-  const key = `${msg.icao}_${msg.type}`;
-  const existing = atisCache.get(key);
-  if (!existing || new Date(msg.timestamp) > new Date(existing.timestamp)) {
-    atisCache.set(key, msg);
+async function cacheGetForAirport(icao: string): Promise<ParsedAtisMessage[]> {
+  const r = getRedis();
+  const upper = icao.toUpperCase();
+  const results: ParsedAtisMessage[] = [];
+
+  if (r) {
+    // Try both ARR and DEP
+    const [arr, dep] = await Promise.all([
+      r.get<ParsedAtisMessage>(cacheKey(upper, "ARR")),
+      r.get<ParsedAtisMessage>(cacheKey(upper, "DEP")),
+    ]);
+    if (arr) results.push(arr);
+    if (dep) results.push(dep);
+  } else {
+    const arr = memoryCache.get(cacheKey(upper, "ARR"));
+    const dep = memoryCache.get(cacheKey(upper, "DEP"));
+    if (arr) results.push(arr);
+    if (dep) results.push(dep);
   }
+
+  results.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+  return results;
 }
 
-/**
- * Scan the airframes API for recent ATIS messages and populate the cache.
- * Fetches up to PAGES_TO_FETCH pages (1000 messages) in parallel batches.
- */
-async function scanAndCache(): Promise<void> {
+// ---------------------------------------------------------------------------
+// Scan & ingest
+// ---------------------------------------------------------------------------
+
+let lastScanAt = 0;
+
+async function scanAndCache(): Promise<number> {
   const now = Date.now();
-  if (now - lastScanAt < MIN_SCAN_INTERVAL_MS) return;
+  if (now - lastScanAt < SCAN_COOLDOWN_MS) return 0;
   lastScanAt = now;
 
+  let ingested = 0;
+
   try {
-    // Fetch in 2 parallel batches of 5 to avoid hammering the API
+    // Fetch in 2 parallel batches of 5
     const batch1 = await Promise.all(
       Array.from({ length: 5 }, (_, i) =>
         fetchMessages({ text: "ATIS", limit: "100", offset: String(i * 100) })
       )
     );
-
     const batch2 = await Promise.all(
       Array.from({ length: 5 }, (_, i) =>
         fetchMessages({ text: "ATIS", limit: "100", offset: String((i + 5) * 100) })
@@ -131,56 +179,35 @@ async function scanAndCache(): Promise<void> {
     for (const msg of allMessages) {
       if (!msg.text) continue;
       const parsed = parseAtisText(msg.text, msg.timestamp);
-      if (parsed) ingestToCache(parsed);
+      if (parsed) {
+        await cacheSet(parsed);
+        ingested++;
+      }
     }
-
-    pruneCache();
   } catch (err) {
     console.error("Airframes scan error:", err);
   }
+
+  return ingested;
 }
 
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
+
 /**
- * Fetch recent ATIS messages for a given ICAO code.
- * Triggers a background scan, then returns cached data.
+ * Fetch ATIS for an airport. Triggers a background scan, then reads from cache.
  */
 export async function fetchAtisForAirport(icao: string): Promise<ParsedAtisMessage[]> {
-  const upperIcao = icao.toUpperCase();
-
+  // Fire scan (non-blocking if cooldown active)
   await scanAndCache();
-
-  const results: ParsedAtisMessage[] = [];
-  for (const [key, msg] of atisCache) {
-    if (key.startsWith(`${upperIcao}_`)) {
-      results.push(msg);
-    }
-  }
-
-  results.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-  return results;
+  return cacheGetForAirport(icao);
 }
 
 /**
- * Get all cached ATIS data (for listing which airports have data).
+ * Dedicated scan endpoint — call from Vercel Cron to keep cache warm.
  */
-export async function fetchAllRecentAtis(): Promise<Map<string, ParsedAtisMessage>> {
-  await scanAndCache();
-
-  const byAirport = new Map<string, ParsedAtisMessage>();
-  for (const msg of atisCache.values()) {
-    const existing = byAirport.get(msg.icao);
-    if (!existing || new Date(msg.timestamp) > new Date(existing.timestamp)) {
-      byAirport.set(msg.icao, msg);
-    }
-  }
-  return byAirport;
-}
-
-/** Get cache stats (for debugging) */
-export function getCacheStats() {
-  return {
-    entries: atisCache.size,
-    airports: new Set([...atisCache.values()].map((m) => m.icao)).size,
-    lastScanAt: lastScanAt ? new Date(lastScanAt).toISOString() : null,
-  };
+export async function runScan(): Promise<{ ingested: number; scannedAt: string }> {
+  const ingested = await scanAndCache();
+  return { ingested, scannedAt: new Date().toISOString() };
 }
