@@ -20,6 +20,7 @@ import { AtisCard } from "@/components/AtisCard";
 import { RawDataBlock } from "@/components/RawDataBlock";
 import { WeatherBlock } from "@/components/WeatherBlock";
 import { PageFooter } from "@/components/PageFooter";
+import { Meteogram } from "@/components/Meteogram";
 
 export default function AtisPage() {
   const params = useParams<{ icao: string }>();
@@ -215,6 +216,11 @@ export default function AtisPage() {
               Réessaye dans quelques minutes ou consulte le voix ATIS.
             </p>
           </div>
+        )}
+
+        {/* Meteogram */}
+        {data.airport.lat != null && data.airport.lon != null && (
+          <Meteogram lat={data.airport.lat} lon={data.airport.lon} />
         )}
 
         {/* METAR */}

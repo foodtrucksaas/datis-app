@@ -4,6 +4,8 @@ export interface Airport {
   name: string;
   city: string;
   country: string;
+  lat?: number;
+  lon?: number;
 }
 
 /** Parsed key fields extracted from an ATIS message */
