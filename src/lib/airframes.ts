@@ -218,9 +218,9 @@ async function fetchTargetedAtis(icao: string): Promise<number> {
   let ingested = 0;
 
   try {
-    // Fetch 500 ATIS messages in parallel (5 pages)
+    // Fetch 200 ATIS messages in parallel (2 pages — stays within Vercel 10s limit)
     const batches = await Promise.all(
-      Array.from({ length: 5 }, (_, i) =>
+      Array.from({ length: 2 }, (_, i) =>
         fetchMessages({ text: "ATIS", limit: "100", offset: String(i * 100) })
       )
     );
