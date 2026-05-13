@@ -78,17 +78,23 @@ export function liveMessageToAtisRecord(
 ): AtisRecord {
   const body = msg.body;
 
-  // Extract runways — handles "ARR RWY 27L AND 26L", "ARR RWY 27L/26L", "LANDING RWY 09R"
-  const arrRwyMatch = body.match(/(?:LANDING|ARR(?:IVAL)?)\s+RWY\s*([\w\s\/]+?)(?=\s+DEP|\s+SID|\s*\n|\s*$)/i);
-  const depRwyMatch = body.match(/(?:DEP(?:ARTURE)?)\s+RWY\s*([\w\s\/]+?)(?=\s+ARR|\s+SID|\s*\n|\s*$)/i);
+  // Extract runways — handles many formats:
+  // "ARR RWY 27L AND 26L", "RWY IN USE 22L", "LANDING RWY 09R", "DEP RWY 27L"
+  const rwyInUseMatch = body.match(/RWY\s+IN\s+USE\s*([\w\s\/]+?)(?=\s*\n|\s*$)/im);
+  const arrRwyMatch =
+    body.match(/(?:LANDING|ARR(?:IVAL)?)\s+RWY\s*([\w\s\/]+?)(?=\s+DEP|\s+SID|\s*\n|\s*$)/i) ||
+    (msg.type === "ARR" ? rwyInUseMatch : null);
+  const depRwyMatch =
+    body.match(/(?:DEP(?:ARTURE)?)\s+RWY\s*([\w\s\/]+?)(?=\s+ARR|\s+SID|\s*\n|\s*$)/i) ||
+    (msg.type === "DEP" ? rwyInUseMatch : null);
 
-  // Extract wind — handles "WIND 250/07 KT", "25007KT", "250/07KT", "WIND 250 07 KT"
+  // Extract wind — handles "WIND 250/07 KT", "WIND 150 4 KT", "25007KT", "250/07KT"
   const windMatch =
-    body.match(/WIND\s+(\d{3})\s*[\/]?\s*(\d{2,3})\s*(G\s*(\d{2,3}))?\s*KT/i) ||
+    body.match(/WIND\s+(\d{3})\s*[\/]?\s*(\d{1,3})\s*(G\s*(\d{1,3}))?\s*KT/i) ||
     body.match(/(\d{3})(\d{2,3})(G(\d{2,3}))?KT/);
 
-  // Extract QNH
-  const qnhMatch = body.match(/Q(\d{4})/i) || body.match(/QNH\s*(\d{4})/i);
+  // Extract QNH — handles "QNH 1005", "Q1005", "QNH 998" (3 or 4 digits)
+  const qnhMatch = body.match(/QNH\s*(\d{3,4})/i) || body.match(/Q(\d{4})/i);
 
   // Extract visibility — handles "CAVOK", "VIS 10KM", "VIS 8000", "9999"
   let visibility = "N/A";
