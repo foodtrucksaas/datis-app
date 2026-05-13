@@ -21,6 +21,7 @@ import { RawDataBlock } from "@/components/RawDataBlock";
 import { WeatherBlock } from "@/components/WeatherBlock";
 import { PageFooter } from "@/components/PageFooter";
 import { Meteogram } from "@/components/Meteogram";
+import { NotamBlock } from "@/components/NotamBlock";
 
 export default function AtisPage() {
   const params = useParams<{ icao: string }>();
@@ -217,6 +218,9 @@ export default function AtisPage() {
             </p>
           </div>
         )}
+
+        {/* NOTAMs */}
+        <NotamBlock icao={icao} />
 
         {/* Meteogram */}
         {data.airport.lat != null && data.airport.lon != null && (
