@@ -107,19 +107,29 @@ function cacheKey(icao: string, type: string): string {
   return `atis:${icao}:${type}`;
 }
 
+/** Should we replace existing cached message with the new one? */
+function shouldReplace(existing: ParsedAtisMessage, incoming: ParsedAtisMessage): boolean {
+  // Different letter = newer ATIS revision, compare by timestamp
+  if (existing.letter !== incoming.letter) {
+    return new Date(incoming.timestamp) > new Date(existing.timestamp);
+  }
+  // Same letter = same ATIS, prefer longer body (complete vs truncated)
+  if (incoming.body.length > existing.body.length) return true;
+  // Same length or shorter, prefer newer
+  return new Date(incoming.timestamp) > new Date(existing.timestamp);
+}
+
 async function cacheSet(msg: ParsedAtisMessage): Promise<void> {
   const r = getRedis();
   const key = cacheKey(msg.icao, msg.type);
 
   if (r) {
-    // Only update if newer than existing
     const existing = await r.get<ParsedAtisMessage>(key);
-    if (existing && new Date(existing.timestamp) >= new Date(msg.timestamp)) return;
+    if (existing && !shouldReplace(existing, msg)) return;
     await r.set(key, msg, { ex: CACHE_TTL_SECONDS });
   } else {
-    // Memory fallback
     const existing = memoryCache.get(key);
-    if (existing && new Date(existing.timestamp) >= new Date(msg.timestamp)) return;
+    if (existing && !shouldReplace(existing, msg)) return;
     memoryCache.set(key, msg);
   }
 }
