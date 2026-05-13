@@ -202,6 +202,22 @@ function decodeTafToken(p: string): TafToken {
   // NSC
   if (p === "NSC") return { label: "Nuages", value: "Pas de nuage significatif", raw: p };
 
+  // TX/TN — max/min temperature forecast
+  if (/^TX(M?\d{2})\/\d{4}Z?$/.test(p)) {
+    const t = p.match(/TX(M?\d{2})\/(\d{2})(\d{2})/);
+    if (t) {
+      const temp = t[1].startsWith("M") ? `-${t[1].slice(1)}` : t[1];
+      return { label: "T° max", value: `${parseInt(temp)}°C à ${t[2]}:${t[3]} UTC`, raw: p };
+    }
+  }
+  if (/^TN(M?\d{2})\/\d{4}Z?$/.test(p)) {
+    const t = p.match(/TN(M?\d{2})\/(\d{2})(\d{2})/);
+    if (t) {
+      const temp = t[1].startsWith("M") ? `-${t[1].slice(1)}` : t[1];
+      return { label: "T° min", value: `${parseInt(temp)}°C à ${t[2]}:${t[3]} UTC`, raw: p };
+    }
+  }
+
   // Unrecognised
   return { label: "Donnée", value: `${p} (non décodé)`, raw: p };
 }

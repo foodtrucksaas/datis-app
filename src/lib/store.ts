@@ -82,34 +82,49 @@ export function liveMessageToAtisRecord(
   const arrRwyMatch = body.match(/(?:LANDING|ARR(?:IVAL)?)\s+RWY\s*(\S+(?:\s*\/\s*\S+)?)/i);
   const depRwyMatch = body.match(/(?:DEP(?:ARTURE)?)\s+RWY\s*(\S+(?:\s*\/\s*\S+)?)/i);
 
-  // Extract wind from METAR-like section or standalone
-  const windMatch = body.match(/(\d{3})(\d{2,3})(G(\d{2,3}))?KT/);
+  // Extract wind — handles "WIND 250/07 KT", "25007KT", "250/07KT", "WIND 250 07 KT"
+  const windMatch =
+    body.match(/WIND\s+(\d{3})\s*[\/]?\s*(\d{2,3})\s*(G\s*(\d{2,3}))?\s*KT/i) ||
+    body.match(/(\d{3})(\d{2,3})(G(\d{2,3}))?KT/);
 
   // Extract QNH
   const qnhMatch = body.match(/Q(\d{4})/i) || body.match(/QNH\s*(\d{4})/i);
 
-  // Extract visibility
+  // Extract visibility — handles "CAVOK", "VIS 10KM", "VIS 8000", "9999"
   let visibility = "N/A";
-  if (/CAVOK/i.test(body)) visibility = "CAVOK";
-  else {
-    const visMatch = body.match(/\b(\d{4})\b(?!\d)/);
-    if (visMatch && parseInt(visMatch[1]) <= 9999) {
-      visibility = `${parseInt(visMatch[1])} m`;
+  if (/CAVOK/i.test(body)) {
+    visibility = "CAVOK";
+  } else {
+    const visKmMatch = body.match(/VIS\s+(\d+)\s*KM/i);
+    const visMetersMatch = body.match(/VIS\s+(\d{4})/i);
+    const rawVisMatch = body.match(/\b(\d{4})\b(?!\d)/);
+    if (visKmMatch) {
+      visibility = `${visKmMatch[1]} km`;
+    } else if (visMetersMatch) {
+      const m = parseInt(visMetersMatch[1]);
+      visibility = m === 9999 ? "10 km+" : `${m} m`;
+    } else if (rawVisMatch && parseInt(rawVisMatch[1]) <= 9999) {
+      const m = parseInt(rawVisMatch[1]);
+      visibility = m === 9999 ? "10 km+" : `${m} m`;
     }
   }
 
   // Extract transition level
   const tlMatch = body.match(/(?:TRANSITION[- ]?LEVEL|TRL?)\s*:?\s*(FL\s*\d+|\d+)/i);
 
-  // Extract temperature
-  const tempMatch = body.match(/(?:^|\s)(M?\d{2})\/(M?\d{2})(?:\s|$)/m);
+  // Extract temperature — handles "T+10 DP+05", "T10/DP5", "M10/05", "10/05"
+  const tempAtisFmt = body.match(/T\s*([+-]?\d{1,2})\s+DP\s*([+-]?\d{1,2})/i);
+  const tempMetarFmt = body.match(/(?:^|\s)(M?\d{2})\/(M?\d{2})(?:\s|$)/m);
+  const tempMatch = tempAtisFmt || tempMetarFmt;
 
   // Extract emission time from body
   const timeMatch = body.match(/(\d{4})Z/);
 
   const parseTemp = (s: string): number | null => {
     if (!s) return null;
-    return s.startsWith("M") ? -parseInt(s.slice(1)) : parseInt(s);
+    const cleaned = s.replace(/^\+/, "");
+    if (cleaned.startsWith("M")) return -parseInt(cleaned.slice(1));
+    return parseInt(cleaned);
   };
 
   const parseRunways = (s: string | undefined): string[] => {
@@ -135,7 +150,12 @@ export function liveMessageToAtisRecord(
       wind: windStr,
       qnh: qnhMatch ? parseInt(qnhMatch[1]) : 0,
       visibility,
-      transitionLevel: tlMatch ? tlMatch[1].replace(/\s/g, "").toUpperCase() : "N/A",
+      transitionLevel: tlMatch
+        ? (() => {
+            const raw = tlMatch[1].replace(/\s/g, "").toUpperCase();
+            return raw.startsWith("FL") ? raw : `FL${raw.padStart(3, "0")}`;
+          })()
+        : "N/A",
       temperature: tempMatch ? parseTemp(tempMatch[1]) : null,
       dewpoint: tempMatch ? parseTemp(tempMatch[2]) : null,
       remarks: null,
