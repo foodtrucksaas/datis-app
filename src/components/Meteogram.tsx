@@ -42,7 +42,7 @@ function WindArrow({ deg }: { deg: number }) {
       height="12"
       viewBox="0 0 12 12"
       className="inline-block align-middle"
-      style={{ transform: `rotate(${deg}deg)` }}
+      style={{ transform: `rotate(${deg + 180}deg)` }}
     >
       <path d="M6 1 L9 9 L6 7 L3 9 Z" fill="currentColor" />
     </svg>
