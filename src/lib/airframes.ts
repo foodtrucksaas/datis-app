@@ -206,15 +206,29 @@ async function fetchTargetedAtis(icao: string): Promise<number> {
   targetedCooldowns.set(upper, now);
 
   let ingested = 0;
+  let foundArr = false;
+  let foundDep = false;
+
   try {
-    // Search airframes specifically for this ICAO
-    const messages = await fetchMessages({ text: upper, limit: "100" });
-    for (const msg of messages) {
-      if (!msg.text) continue;
-      const parsed = parseAtisText(msg.text, msg.timestamp);
-      if (parsed && parsed.icao === upper) {
+    // Scan ATIS feed page by page until we find both ARR+DEP for this ICAO
+    // or exhaust 2000 messages (20 pages)
+    for (let page = 0; page < 20 && (!foundArr || !foundDep); page++) {
+      const messages = await fetchMessages({
+        text: "ATIS",
+        limit: "100",
+        offset: String(page * 100),
+      });
+      if (messages.length === 0) break;
+
+      for (const msg of messages) {
+        if (!msg.text) continue;
+        const parsed = parseAtisText(msg.text, msg.timestamp);
+        if (!parsed) continue;
+        // Cache everything we find along the way
         await cacheSet(parsed);
         ingested++;
+        if (parsed.icao === upper && parsed.type === "ARR") foundArr = true;
+        if (parsed.icao === upper && parsed.type === "DEP") foundDep = true;
       }
     }
   } catch (err) {
@@ -234,16 +248,20 @@ async function fetchTargetedAtis(icao: string): Promise<number> {
  * 3. Also trigger the broad scan in background (non-blocking)
  */
 export async function fetchAtisForAirport(icao: string): Promise<ParsedAtisMessage[]> {
+  // Check cache first
+  let cached = await cacheGetForAirport(icao);
+
+  // If we don't have both ARR and DEP, do a targeted search
+  const hasArr = cached.some(m => m.type === "ARR");
+  const hasDep = cached.some(m => m.type === "DEP");
+  if (!hasArr || !hasDep) {
+    await fetchTargetedAtis(icao);
+    cached = await cacheGetForAirport(icao);
+  }
+
   // Broad scan in background (non-blocking, respects cooldown)
   scanAndCache().catch(() => {});
 
-  // Check cache
-  let cached = await cacheGetForAirport(icao);
-  if (cached.length > 0) return cached;
-
-  // Cache miss — targeted fetch for this specific airport
-  await fetchTargetedAtis(icao);
-  cached = await cacheGetForAirport(icao);
   return cached;
 }
 
