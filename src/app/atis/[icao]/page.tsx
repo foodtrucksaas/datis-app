@@ -5,7 +5,6 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Plane, Loader2 } from "lucide-react";
 import {
-  getAirportData,
   getSettings,
   updateSettings,
   addRecent,
@@ -40,8 +39,16 @@ export default function AtisPage() {
     // Try live API first
     const liveResponse = await fetchLiveAtis(icao);
 
+    // Build METAR/TAF from live response
+    const liveMetar = liveResponse?.metar
+      ? { icao: liveResponse.metar.icao, raw: liveResponse.metar.raw, receivedAt: liveResponse.metar.fetchedAt }
+      : null;
+    const liveTaf = liveResponse?.taf
+      ? { icao: liveResponse.taf.icao, raw: liveResponse.taf.raw, receivedAt: liveResponse.taf.fetchedAt }
+      : null;
+
     if (liveResponse && liveResponse.messages && liveResponse.messages.length > 0) {
-      // We got live data
+      // We got live ATIS data
       const airport = liveResponse.airport
         ? liveResponse.airport
         : findAirport(icao) ?? { icao, name: icao, city: "", country: "" };
@@ -49,42 +56,32 @@ export default function AtisPage() {
       const mostRecent = liveResponse.messages[0];
       const atisRecord = liveMessageToAtisRecord(mostRecent);
 
-      // Use mock METAR/TAF as fallback (live METAR/TAF would come from a weather API later)
-      const mockData = getAirportData(icao);
-
       setData({
         airport,
         atis: atisRecord,
-        metar: mockData?.metar ?? null,
-        taf: mockData?.taf ?? null,
+        metar: liveMetar,
+        taf: liveTaf,
       });
       setNotFound(false);
       setIsLive(true);
       addRecent(icao);
     } else {
-      // Fallback to mock data
-      const mockData = getAirportData(icao);
-      if (mockData) {
-        setData(mockData);
+      // No live ATIS — show airport with live METAR/TAF if available
+      const airport = liveResponse?.airport ?? findAirport(icao);
+      if (airport || liveMetar || liveTaf) {
+        setData({
+          airport: airport ?? { icao, name: icao, city: "", country: "" },
+          atis: null,
+          metar: liveMetar,
+          taf: liveTaf,
+        });
         setNotFound(false);
-        setIsLive(false);
         addRecent(icao);
       } else {
-        // Check if we got an airport from the live response even without messages
-        const airport = liveResponse?.airport ?? findAirport(icao);
-        if (airport) {
-          setData({
-            airport,
-            atis: null,
-            metar: null,
-            taf: null,
-          });
-          setNotFound(false);
-        } else {
-          setNotFound(true);
-          setData(null);
-        }
+        setNotFound(true);
+        setData(null);
       }
+      setIsLive(false);
     }
 
     setLoading(false);

@@ -49,6 +49,8 @@ export interface LiveAtisResponse {
     timestamp: string;
     raw: string;
   }>;
+  metar: { icao: string; raw: string; fetchedAt: string } | null;
+  taf: { icao: string; raw: string; fetchedAt: string } | null;
   fetchedAt: string;
   error?: string;
 }
