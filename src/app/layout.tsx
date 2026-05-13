@@ -18,6 +18,16 @@ export const metadata: Metadata = {
     "Agrégation des D-ATIS européens reçus via ACARS. Usage informatif uniquement.",
 };
 
+// Inline script to apply theme before paint (prevents flash)
+const themeScript = `
+  (function() {
+    try {
+      var theme = localStorage.getItem('atis-eu:theme');
+      if (theme === 'dark') document.documentElement.classList.add('dark');
+    } catch(e) {}
+  })();
+`;
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -26,8 +36,12 @@ export default function RootLayout({
   return (
     <html
       lang="fr"
-      className={`${inter.variable} ${jetbrainsMono.variable} dark h-full antialiased`}
+      className={`${inter.variable} ${jetbrainsMono.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
       <body className="min-h-full flex flex-col bg-[var(--bg)] text-[var(--text-primary)]">
         {children}
       </body>

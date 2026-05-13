@@ -61,34 +61,55 @@
   --radius-xl: 0.875rem;
 }
 
+/* ---- Light theme (default) ---- */
 :root {
-  /* Fond et surfaces */
+  --bg: #F8FAFC;
+  --surface: #FFFFFF;
+  --surface-elevated: #F1F5F9;
+  --border: #E2E8F0;
+
+  --text-primary: #0F172A;
+  --text-secondary: #475569;
+  --text-muted: #94A3B8;
+
+  --accent: #0284C7;
+  --accent-dim: #0369A1;
+
+  --fresh: #16A34A;
+  --warm: #D97706;
+  --stale: #DC2626;
+  --cold: #6B7280;
+
+  --warning-bg: rgba(217, 119, 6, 0.08);
+  --warning-border: rgba(217, 119, 6, 0.2);
+  --warning-text: #D97706;
+
+  --mono-bg: #F1F5F9;
+}
+
+/* ---- Dark theme ---- */
+.dark {
   --bg: #0A0E14;
   --surface: #131820;
   --surface-elevated: #1A2029;
   --border: #232B36;
 
-  /* Texte */
   --text-primary: #E6EDF3;
   --text-secondary: #8B98A8;
   --text-muted: #5A6675;
 
-  /* Accent — bleu instrument */
   --accent: #38BDF8;
   --accent-dim: #0EA5E9;
 
-  /* Sémantique fraîcheur */
   --fresh: #4ADE80;
   --warm: #FBBF24;
   --stale: #F87171;
   --cold: #6B7280;
 
-  /* Disclaimer / warning */
   --warning-bg: rgba(251, 191, 36, 0.08);
   --warning-border: rgba(251, 191, 36, 0.2);
   --warning-text: #FBBF24;
 
-  /* Mono pour data */
   --mono-bg: #0D1117;
 }
 

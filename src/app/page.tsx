@@ -2,6 +2,7 @@
 
 import { FirstLaunchDisclaimer } from "@/components/FirstLaunchDisclaimer";
 import { IcaoInput } from "@/components/IcaoInput";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import Link from "next/link";
 
 export default function Home() {
@@ -10,10 +11,11 @@ export default function Home() {
       <FirstLaunchDisclaimer />
 
       {/* Header */}
-      <header className="flex items-center px-5 py-4">
+      <header className="flex items-center justify-between px-5 py-4">
         <span className="font-mono text-base font-semibold tracking-wide text-[var(--accent)]">
           ATIS·EU
         </span>
+        <ThemeToggle />
       </header>
 
       {/* Main content — centered */}
