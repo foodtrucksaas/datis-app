@@ -30,16 +30,18 @@ export async function fetchAtisFromGuru(icao: string): Promise<ParsedAtisMessage
 
     const html = await res.text();
 
-    // Extract ATIS blocks from Blazor server-rendered HTML
-    const blocks = html.match(/<div class="atis">([\s\S]*?)<\/div>/g);
-    if (!blocks) return [];
+    // Extract each card block: timestamp in <h6> + ATIS in <div class="atis">
+    // Pattern: <h6 ...>2026-05-12 08:39 UTC</h6> ... <div class="atis">...</div>
+    const cardPattern = /<h6[^>]*class="card-subtitle[^"]*"[^>]*>(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})\s*UTC<\/h6>\s*<div class="atis">([\s\S]*?)<\/div>/g;
 
     const results: ParsedAtisMessage[] = [];
+    let cardMatch;
 
-    for (const block of blocks) {
-      const inner = block
-        .replace(/<div class="atis">/, "")
-        .replace(/<\/div>/, "")
+    while ((cardMatch = cardPattern.exec(html)) !== null) {
+      const rawTimestamp = cardMatch[1]; // "2026-05-12 08:39"
+      const timestamp = new Date(rawTimestamp.replace(" ", "T") + ":00Z").toISOString();
+
+      const inner = cardMatch[2]
         .replace(/&#xA;/g, "\n")
         .replace(/&#xD;/g, "")
         .replace(/&#x9;/g, "\t")
@@ -59,9 +61,42 @@ export async function fetchAtisFromGuru(icao: string): Promise<ParsedAtisMessage
         type,
         letter,
         body,
-        timestamp: new Date().toISOString(),
+        timestamp,
         raw: inner,
       });
+    }
+
+    // Fallback: if card pattern didn't match, try the old simple pattern
+    if (results.length === 0) {
+      const blocks = html.match(/<div class="atis">([\s\S]*?)<\/div>/g);
+      if (!blocks) return [];
+
+      for (const block of blocks) {
+        const inner = block
+          .replace(/<div class="atis">/, "")
+          .replace(/<\/div>/, "")
+          .replace(/&#xA;/g, "\n")
+          .replace(/&#xD;/g, "")
+          .replace(/&#x9;/g, "\t")
+          .replace(/&#\w+;/g, "")
+          .trim();
+
+        const match = inner.match(/^([A-Z]{4})\s+(ARR|DEP)\s+ATIS\s+([A-Z])/);
+        if (!match || match[1] !== upper) continue;
+
+        const type = match[2] as "ARR" | "DEP";
+        const letter = match[3];
+        const body = inner.slice(match[0].length).trim();
+
+        results.push({
+          icao: upper,
+          type,
+          letter,
+          body,
+          timestamp: new Date().toISOString(),
+          raw: inner,
+        });
+      }
     }
 
     return results;
