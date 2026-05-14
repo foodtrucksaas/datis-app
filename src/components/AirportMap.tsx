@@ -76,8 +76,7 @@ export default function AirportMap({ favorites, recents }: AirportMapProps) {
         .pointAltitude(0)
         .pointRadius("size")
         .pointColor("color")
-        .pointResolution(6)
-        .pointsMerge(true)
+        .pointResolution(4)
         .pointLabel((d: object) => {
           const p = d as GlobePoint;
           return `<div style="font-family:ui-monospace,monospace;background:rgba(0,0,0,0.8);backdrop-filter:blur(8px);padding:8px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.1)">
