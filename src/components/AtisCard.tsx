@@ -46,8 +46,9 @@ export function AtisCard({ atis }: AtisCardProps) {
       {/* Hero letter */}
       <div className="flex flex-col items-center gap-2">
         <div className="flex h-20 w-20 items-center justify-center rounded-full border-2 border-[var(--accent)]/40 bg-[var(--accent)]/8">
-          <span className="font-mono text-4xl font-bold text-[var(--accent)]">
-            {fields.letter}
+          <span className="font-mono font-bold text-[var(--accent)] flex flex-col items-center leading-none">
+            <span className="text-[10px] tracking-widest">INFO</span>
+            <span className="text-4xl">{fields.letter}</span>
           </span>
         </div>
         {fields.type && (
