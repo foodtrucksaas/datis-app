@@ -58,7 +58,7 @@ export default function AirportMap({ favorites, recents }: AirportMapProps) {
       const globe = new Globe(containerRef.current)
         .globeImageUrl("//unpkg.com/three-globe/example/img/earth-blue-marble.jpg")
         .bumpImageUrl("//unpkg.com/three-globe/example/img/earth-topology.png")
-        .backgroundImageUrl("//unpkg.com/three-globe/example/img/night-sky.png")
+        .backgroundColor("#000010")
         .showAtmosphere(true)
         .atmosphereColor("#4da6ff")
         .atmosphereAltitude(0.18)
