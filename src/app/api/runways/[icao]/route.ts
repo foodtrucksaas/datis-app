@@ -7,13 +7,16 @@ interface RunwayData {
   width_ft: number;
   le_heading_degT: number | null;
   he_heading_degT: number | null;
+  le_lat: number | null;
+  le_lon: number | null;
+  he_lat: number | null;
+  he_lon: number | null;
   surface: string;
 }
 
 const RUNWAYS_CSV_URL =
   "https://davidmegginson.github.io/ourairports-data/runways.csv";
 
-// In-memory cache: ICAO → RunwayData[]
 let cache: Map<string, RunwayData[]> | null = null;
 let cacheTimestamp = 0;
 const CACHE_TTL = 24 * 60 * 60 * 1000; // 24h
@@ -36,6 +39,10 @@ async function loadRunways(): Promise<Map<string, RunwayData[]>> {
   const iWidth = idx("width_ft");
   const iLeHdg = idx("le_heading_degT");
   const iHeHdg = idx("he_heading_degT");
+  const iLeLat = idx("le_latitude_deg");
+  const iLeLon = idx("le_longitude_deg");
+  const iHeLat = idx("he_latitude_deg");
+  const iHeLon = idx("he_longitude_deg");
   const iSurface = idx("surface");
 
   const map = new Map<string, RunwayData[]>();
@@ -44,9 +51,7 @@ async function loadRunways(): Promise<Map<string, RunwayData[]>> {
     const line = lines[i].trim();
     if (!line) continue;
 
-    // Simple CSV parse (OurAirports uses simple format, no quoted commas in fields we need)
     const cols = line.split(",").map((c) => c.replace(/"/g, "").trim());
-
     const airport = cols[iAirport];
     if (!airport) continue;
 
@@ -57,10 +62,13 @@ async function loadRunways(): Promise<Map<string, RunwayData[]>> {
       width_ft: parseInt(cols[iWidth]) || 0,
       le_heading_degT: cols[iLeHdg] ? parseFloat(cols[iLeHdg]) : null,
       he_heading_degT: cols[iHeHdg] ? parseFloat(cols[iHeHdg]) : null,
+      le_lat: cols[iLeLat] ? parseFloat(cols[iLeLat]) : null,
+      le_lon: cols[iLeLon] ? parseFloat(cols[iLeLon]) : null,
+      he_lat: cols[iHeLat] ? parseFloat(cols[iHeLat]) : null,
+      he_lon: cols[iHeLon] ? parseFloat(cols[iHeLon]) : null,
       surface: cols[iSurface] || "",
     };
 
-    // Skip helipads, closed runways, very short strips
     if (rwy.le_ident.startsWith("H") || rwy.length_ft < 500) continue;
 
     const list = map.get(airport) || [];
