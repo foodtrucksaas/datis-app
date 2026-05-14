@@ -69,7 +69,8 @@ async function loadRunways(): Promise<Map<string, RunwayData[]>> {
       surface: cols[iSurface] || "",
     };
 
-    if (rwy.le_ident.startsWith("H") || rwy.length_ft < 500) continue;
+    // Skip helipads (H1, 08H, etc.), closed runways, very short strips
+    if (/H/i.test(rwy.le_ident) || /H/i.test(rwy.he_ident) || rwy.length_ft < 1500) continue;
 
     const list = map.get(airport) || [];
     list.push(rwy);
