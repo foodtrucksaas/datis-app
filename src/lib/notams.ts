@@ -75,22 +75,51 @@ function cleanMessage(msg: string): string {
 /** Guess subject from Q-code or message content */
 function guessSubject(qcode: string, message: string): string {
   const upper = message.toUpperCase();
-  if (/\bRWY\b|\bRUNWAY\b/.test(upper)) return "Runway";
-  if (/\bTWY\b|\bTAXIWAY\b/.test(upper)) return "Taxiway(s)";
+  // Check procedures FIRST (before RWY, since "APPROACH RWY 26R" should be IAP not RWY)
+  if (/\bINSTRUMENT APPROACH\b|\bIAP\b|\bRNP\b/.test(upper)) return "Instrument approach procedure";
+  if (/\bSTAR\b/.test(upper) && !/\bSTART\b/.test(upper)) return "Instrument approach procedure";
+  if (/\bSID\b|\bDEPARTURE PROC/.test(upper)) return "Standard instrument departure";
   if (/\bILS\b/.test(upper)) return "Instrument landing system";
   if (/\bVOR\b/.test(upper)) return "VOR";
   if (/\bDME\b/.test(upper)) return "DME";
   if (/\bNDB\b/.test(upper)) return "NDB";
+  if (/\bTWY\b|\bTAXIWAY\b/.test(upper)) return "Taxiway(s)";
+  if (/\bRWY\b|\bRUNWAY\b/.test(upper)) return "Runway";
   if (/\bPAPI\b|\bLIGHT\b|\bLGT\b/.test(upper)) return "Lighting";
   if (/\bFUEL\b/.test(upper)) return "Fuel availability";
   if (/\bAPRON\b|\bPARKING\b/.test(upper)) return "Parking area";
-  if (/\bSID\b|\bDEPARTURE\b/.test(upper)) return "Standard instrument departure";
-  if (/\bSTAR\b|\bAPPROACH\b|\bIAP\b/.test(upper)) return "Instrument approach procedure";
+  if (qcode.startsWith("QI")) return "Instrument approach procedure";
   if (qcode.startsWith("QM")) return "Runway";
   if (qcode.startsWith("QN")) return "NDB";
   if (qcode.startsWith("QL")) return "Lighting";
   if (qcode.startsWith("QF")) return "Aerodrome";
   return "Aerodrome";
+}
+
+/** Check if a message is garbage / too short to be useful */
+function isGarbageMessage(message: string): boolean {
+  const clean = message.replace(/\s+/g, " ").trim();
+  // Too short or just a reference stub
+  if (clean.length < 5) return true;
+  // Starts with $ (RSC payload artifact)
+  if (clean.startsWith("$")) return true;
+  // Just "REF :" with no useful content
+  if (/^REF\s*:\s*$/i.test(clean.split("\n")[0]) && clean.length < 10) return true;
+  return false;
+}
+
+/** Deduplicate similar NOTAMs (e.g. 7x "US DOD PROCEDURAL NOTAM INSTRUMENT APPROACH...") */
+function deduplicateNotams(notams: Notam[]): Notam[] {
+  const seen = new Map<string, Notam>();
+  for (const n of notams) {
+    // Build a dedup key from subject + first 50 chars of message (normalized)
+    const msgKey = n.message.toUpperCase().replace(/RWY\s+\w+/g, "RWY X").slice(0, 50);
+    const key = `${n.subject}:${msgKey}`;
+    if (!seen.has(key)) {
+      seen.set(key, n);
+    }
+  }
+  return Array.from(seen.values());
 }
 
 /** Guess condition from Q-code modifier */
@@ -220,11 +249,12 @@ async function fetchFromNotamify(icao: string): Promise<Notam[]> {
 
     const now = new Date();
 
-    return entries
+    const mapped = entries
       .filter((n) => {
         const start = new Date(n.starts_at);
         const end = new Date(n.ends_at);
         if (start > now || end < now) return false;
+        if (isGarbageMessage(n.message)) return false;
         const qMatch = n.all.match(/Q\)\s*\w+\/(\w+)\//);
         const qcode = qMatch?.[1] ?? "";
         const subject = guessSubject(qcode, n.message);
@@ -245,12 +275,14 @@ async function fetchFromNotamify(icao: string): Promise<Notam[]> {
           raw: n.all,
           severity: getSeverity(condition, n.message),
         };
-      })
+      });
+
+    return deduplicateNotams(mapped)
       .sort((a, b) => {
         const order = { high: 0, medium: 1, low: 2 };
         return order[a.severity] - order[b.severity];
       })
-      .slice(0, 15);
+      .slice(0, 10);
   } catch {
     return [];
   }
@@ -278,13 +310,14 @@ async function fetchFromIcao(icao: string): Promise<Notam[]> {
     const data: IcaoNotam[] = await res.json();
     const now = new Date();
 
-    return data
+    const mapped = data
       .filter((n) => {
         if (!OPERATIONAL_SUBJECTS.has(n.Subject)) return false;
         if (n.location !== icao) return false;
         const start = new Date(n.startdate);
         const end = new Date(n.enddate);
         if (start > now || end < now) return false;
+        if (isGarbageMessage(n.message)) return false;
         return true;
       })
       .map((n) => ({
@@ -296,12 +329,14 @@ async function fetchFromIcao(icao: string): Promise<Notam[]> {
         endDate: n.enddate,
         raw: n.all,
         severity: getSeverity(n.Condition, n.message),
-      }))
+      }));
+
+    return deduplicateNotams(mapped)
       .sort((a, b) => {
         const order = { high: 0, medium: 1, low: 2 };
         return order[a.severity] - order[b.severity];
       })
-      .slice(0, 15);
+      .slice(0, 10);
   } catch {
     return [];
   }
