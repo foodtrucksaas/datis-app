@@ -1,5 +1,6 @@
 interface WordmarkProps {
   size?: "lg" | "md" | "sm";
+  variant?: "light" | "dark";
 }
 
 const sizes = {
@@ -20,13 +21,15 @@ const sizes = {
   },
 };
 
-export function Wordmark({ size = "md" }: WordmarkProps) {
+export function Wordmark({ size = "md", variant }: WordmarkProps) {
   const s = sizes[size];
+  const atisColor = variant === "dark" ? "text-white" : variant === "light" ? "text-[#0A0E14]" : "text-[var(--text-primary)]";
+  const liveColor = variant === "dark" ? "text-white/50" : variant === "light" ? "text-[#5A6675]" : "text-[var(--text-secondary)]";
 
   return (
     <span className="inline-flex items-baseline font-mono select-none">
       <span
-        className={`${s.atis} font-medium text-[var(--text-primary)] tracking-[-0.02em]`}
+        className={`${s.atis} font-medium ${atisColor} tracking-[-0.02em]`}
       >
         ATIS
       </span>
@@ -36,7 +39,7 @@ export function Wordmark({ size = "md" }: WordmarkProps) {
         .
       </span>
       <span
-        className={`${s.live} font-normal text-[var(--text-secondary)] tracking-[-0.01em]`}
+        className={`${s.live} font-normal ${liveColor} tracking-[-0.01em]`}
       >
         live
       </span>

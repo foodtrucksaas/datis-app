@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
+import { Wordmark } from "@/components/Wordmark";
 
 export default function LegalPage() {
   return (
@@ -8,9 +9,7 @@ export default function LegalPage() {
         <Link href="/" className="text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors">
           <ArrowLeft className="h-5 w-5" />
         </Link>
-        <span className="font-mono text-base font-semibold tracking-wide text-[var(--accent)]">
-          ATIS·EU
-        </span>
+        <Wordmark size="sm" />
       </header>
 
       <main className="mx-auto max-w-2xl flex-1 px-5 py-8">
@@ -24,7 +23,7 @@ export default function LegalPage() {
               Nature du service
             </h2>
             <p>
-              ATIS·EU est un service d&apos;agrégation et de présentation de
+              ATIS.live est un service d&apos;agrégation et de présentation de
               messages D-ATIS (Digital Automatic Terminal Information Service)
               reçus via le réseau communautaire ACARS, opéré par airframes.io.
               Ce service a une vocation strictement informative.

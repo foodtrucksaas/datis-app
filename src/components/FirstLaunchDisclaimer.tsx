@@ -36,7 +36,7 @@ export function FirstLaunchDisclaimer({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-      <div className="w-full max-w-lg rounded-lg border border-white/10 bg-[#131820] p-6 shadow-2xl">
+      <div className="w-full max-w-lg rounded-lg border border-white/10 bg-[#131820] p-6 shadow-2xl font-sans">
         <div className="mb-4 flex items-center gap-3">
           <AlertTriangle className="h-6 w-6 shrink-0 text-amber-400" />
           <h2 className="text-lg font-semibold text-white">
@@ -64,7 +64,7 @@ export function FirstLaunchDisclaimer({
         <div className="mt-6">
           <button
             onClick={handleAccept}
-            className="w-full rounded-md bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-dim)]"
+            className="w-full rounded-md border border-[var(--accent)]/50 bg-[var(--accent)]/10 px-4 py-2.5 text-sm font-medium text-[var(--accent)] transition-colors hover:bg-[var(--accent)]/20"
           >
             J&apos;ai compris et j&apos;accepte
           </button>

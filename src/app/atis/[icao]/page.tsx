@@ -198,9 +198,7 @@ export default function AtisPage() {
         <Link href="/" className="p-1 -ml-1 text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors">
           <ArrowLeft className="h-5 w-5" />
         </Link>
-        <span className="font-mono text-base font-semibold tracking-wide text-[var(--accent)]">
-          ATIS·EU
-        </span>
+        <Wordmark size="sm" />
         <span className="font-mono text-xs font-medium text-[var(--text-muted)]">
           · {icao}
         </span>

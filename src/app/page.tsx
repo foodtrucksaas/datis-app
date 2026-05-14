@@ -32,13 +32,13 @@ export default function Home() {
 
         {/* Top bar: logo + clock */}
         <header className="flex items-center justify-between px-5 py-3">
-          <Wordmark size="sm" />
+          <Wordmark size="sm" variant="dark" />
           <UtcClockInline />
         </header>
 
         {/* Search section */}
         <div className="flex flex-col items-center gap-4 px-5 pb-4">
-          <Wordmark size="lg" />
+          <Wordmark size="lg" variant="dark" />
 
           <div className="w-full max-w-md">
             <IcaoInput variant="dark" />
