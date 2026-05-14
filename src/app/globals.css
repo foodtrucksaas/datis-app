@@ -2,7 +2,7 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
-@custom-variant dark (&:is(.dark *));
+@custom-variant dark (&:not(.light *));
 
 @theme inline {
   --color-background: var(--bg);
@@ -61,35 +61,8 @@
   --radius-xl: 0.875rem;
 }
 
-/* ---- Light mode (tarmac soleil) ---- */
+/* ---- Dark mode (cockpit de nuit) — DEFAULT ---- */
 :root {
-  --bg: #FAFAFA;
-  --surface: #FFFFFF;
-  --surface-elevated: #F4F5F7;
-  --border: #E4E7EC;
-
-  --text-primary: #0A0E14;
-  --text-secondary: #5A6675;
-  --text-muted: #8B98A8;
-
-  /* Signal — couleur unique d'accent */
-  --accent: #F59E0B;
-  --accent-dim: #D97706;
-
-  --fresh: #4ADE80;
-  --warm: #FBBF24;
-  --stale: #F87171;
-  --cold: #6B7280;
-
-  --warning-bg: rgba(251, 191, 36, 0.08);
-  --warning-border: rgba(251, 191, 36, 0.2);
-  --warning-text: #D97706;
-
-  --mono-bg: #F4F5F7;
-}
-
-/* ---- Dark mode (cockpit de nuit) ---- */
-.dark {
   --bg: #0A0E14;          /* Void */
   --surface: #131820;     /* Deck */
   --surface-elevated: #1A2029; /* Panel */
@@ -112,6 +85,32 @@
   --warning-text: #FBBF24;
 
   --mono-bg: #0A0E14;
+}
+
+/* ---- Light mode (tarmac soleil) ---- */
+.light {
+  --bg: #FAFAFA;
+  --surface: #FFFFFF;
+  --surface-elevated: #F4F5F7;
+  --border: #E4E7EC;
+
+  --text-primary: #0A0E14;
+  --text-secondary: #5A6675;
+  --text-muted: #8B98A8;
+
+  --accent: #F59E0B;
+  --accent-dim: #D97706;
+
+  --fresh: #4ADE80;
+  --warm: #FBBF24;
+  --stale: #F87171;
+  --cold: #6B7280;
+
+  --warning-bg: rgba(251, 191, 36, 0.08);
+  --warning-border: rgba(251, 191, 36, 0.2);
+  --warning-text: #D97706;
+
+  --mono-bg: #F4F5F7;
 }
 
 /* Signal dot pulse — 2s loop, opacity 1 → 0.4 */

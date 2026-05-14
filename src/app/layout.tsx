@@ -19,8 +19,8 @@ export const metadata: Metadata = {
 const themeScript = `
   (function() {
     try {
-      var theme = localStorage.getItem('atis-eu:theme');
-      if (theme === 'dark') document.documentElement.classList.add('dark');
+      var theme = localStorage.getItem('atis-live:theme');
+      if (theme === 'light') document.documentElement.classList.add('light');
     } catch(e) {}
   })();
 `;

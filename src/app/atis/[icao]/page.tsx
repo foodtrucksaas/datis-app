@@ -25,6 +25,7 @@ import { PageFooter } from "@/components/PageFooter";
 import { Meteogram } from "@/components/Meteogram";
 import { NotamBlock } from "@/components/NotamBlock";
 import { SunTimes } from "@/components/SunTimes";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 export default function AtisPage() {
   const params = useParams<{ icao: string }>();
@@ -209,6 +210,7 @@ export default function AtisPage() {
             </span>
           )}
           <UtcClock />
+          <ThemeToggle />
         </div>
       </header>
 

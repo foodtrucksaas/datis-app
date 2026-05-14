@@ -6,12 +6,13 @@ import { FirstLaunchDisclaimer } from "@/components/FirstLaunchDisclaimer";
 import { IcaoInput } from "@/components/IcaoInput";
 import { getFavorites, getRecents } from "@/lib/store";
 import { Wordmark } from "@/components/Wordmark";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import Link from "next/link";
 
 const AirportMap = dynamic(() => import("@/components/AirportMap"), {
   ssr: false,
   loading: () => (
-    <div className="flex-1 bg-[#0a0f1a]" />
+    <div className="flex-1 bg-[var(--bg)]" />
   ),
 });
 
@@ -28,20 +29,23 @@ export default function Home() {
     <>
       <FirstLaunchDisclaimer />
 
-      <div className="flex min-h-dvh flex-col bg-[#0a0f1a] text-white">
+      <div className="flex min-h-dvh flex-col bg-[var(--bg)] text-[var(--text-primary)]">
 
         {/* Top bar: logo + clock */}
         <header className="flex items-center justify-between px-5 py-3">
-          <Wordmark size="sm" variant="dark" />
-          <UtcClockInline />
+          <Wordmark size="sm" />
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <UtcClockInline />
+          </div>
         </header>
 
         {/* Search section */}
         <div className="flex flex-col items-center gap-4 px-5 pb-4">
-          <Wordmark size="lg" variant="dark" />
+          <Wordmark size="lg" />
 
           <div className="w-full max-w-md">
-            <IcaoInput variant="dark" />
+            <IcaoInput />
           </div>
 
           {/* Quick access pills */}
@@ -51,7 +55,7 @@ export default function Home() {
                 <Link
                   key={icao}
                   href={`/atis/${icao}`}
-                  className="rounded-full border border-amber-400/30 bg-amber-400/10 px-3 py-1 font-mono text-xs font-semibold text-amber-400 transition-colors hover:bg-amber-400/20"
+                  className="rounded-full border border-[var(--accent)]/30 bg-[var(--accent)]/10 px-3 py-1 font-mono text-xs font-semibold text-[var(--accent)] transition-colors hover:bg-[var(--accent)]/20"
                 >
                   {icao}
                 </Link>
@@ -60,7 +64,7 @@ export default function Home() {
                 <Link
                   key={icao}
                   href={`/atis/${icao}`}
-                  className="rounded-full border border-white/10 bg-white/5 px-3 py-1 font-mono text-xs text-white/60 transition-colors hover:bg-white/10 hover:text-white/80"
+                  className="rounded-full border border-[var(--border)] bg-[var(--surface)] px-3 py-1 font-mono text-xs text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-elevated)] hover:text-[var(--text-primary)]"
                 >
                   {icao}
                 </Link>
@@ -75,12 +79,12 @@ export default function Home() {
 
           {/* Footer overlaid at bottom of globe */}
           <div className="absolute bottom-0 left-0 right-0 flex items-center justify-between px-5 py-3 z-10">
-            <span className="font-mono text-[9px] uppercase tracking-wider text-white/20">
+            <span className="font-mono text-[9px] uppercase tracking-wider text-[var(--text-muted)]/50">
               Not for operational use
             </span>
             <Link
               href="/legal"
-              className="font-mono text-[9px] text-white/20 hover:text-white/40 transition-colors"
+              className="font-mono text-[9px] text-[var(--text-muted)]/50 hover:text-[var(--text-muted)] transition-colors"
             >
               Mentions légales
             </Link>
@@ -108,7 +112,7 @@ function UtcClockInline() {
   }, []);
 
   return (
-    <span className="font-mono text-xs font-semibold tabular-nums text-white/40">
+    <span className="font-mono text-xs font-semibold tabular-nums text-[var(--text-muted)]">
       {time}
     </span>
   );
