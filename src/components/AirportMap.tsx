@@ -18,8 +18,6 @@ interface GlobePoint {
   color: string;
 }
 
-const BG = "rgba(0,0,0,0)";
-
 export default function AirportMap({ favorites, recents }: AirportMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -40,8 +38,8 @@ export default function AirportMap({ favorites, recents }: AirportMapProps) {
           lng: a.lon!,
           icao: a.icao,
           name: a.name,
-          size: isFav ? 0.55 : isRecent ? 0.4 : 0.18,
-          color: isFav ? "#FBBF24" : isRecent ? "#38BDF8" : "rgba(255,255,255,0.5)",
+          size: isFav ? 0.4 : isRecent ? 0.3 : 0.12,
+          color: isFav ? "#FBBF24" : isRecent ? "#38BDF8" : "rgba(255,255,255,0.45)",
         };
       });
   }, [favSet, recentSet]);
@@ -66,28 +64,28 @@ export default function AirportMap({ favorites, recents }: AirportMapProps) {
       const globe = new Globe(containerRef.current)
         .globeImageUrl("//unpkg.com/three-globe/example/img/earth-blue-marble.jpg")
         .bumpImageUrl("//unpkg.com/three-globe/example/img/earth-topology.png")
-        .backgroundColor(BG)
+        .backgroundColor("rgba(0,0,0,0)")
         .showAtmosphere(true)
         .atmosphereColor("#3a7bd5")
         .atmosphereAltitude(0.15)
         .pointOfView({ lat: 46, lng: 6, altitude: 2.2 }, 0)
-        // Flat dots using labelsData (HTML billboards, always face camera)
-        .labelsData(points)
-        .labelLat("lat")
-        .labelLng("lng")
-        .labelText(() => "")
-        .labelDotRadius((d: object) => (d as GlobePoint).size)
-        .labelColor((d: object) => (d as GlobePoint).color)
-        .labelResolution(2)
-        .labelAltitude(0.005)
-        .labelLabel((d: object) => {
+        // Flat merged points — single GPU draw call
+        .pointsData(points)
+        .pointLat("lat")
+        .pointLng("lng")
+        .pointAltitude(0)
+        .pointRadius("size")
+        .pointColor("color")
+        .pointResolution(6)
+        .pointsMerge(true)
+        .pointLabel((d: object) => {
           const p = d as GlobePoint;
           return `<div style="font-family:ui-monospace,monospace;background:rgba(0,0,0,0.8);backdrop-filter:blur(8px);padding:8px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.1)">
             <div style="font-size:14px;font-weight:800;letter-spacing:0.06em;color:#38BDF8">${p.icao}</div>
             <div style="font-size:11px;color:rgba(255,255,255,0.7);margin-top:2px">${p.name}</div>
           </div>`;
         })
-        .onLabelClick(handleClick);
+        .onPointClick(handleClick);
 
       // Responsive sizing
       function resize() {
@@ -99,7 +97,6 @@ export default function AirportMap({ favorites, recents }: AirportMapProps) {
       resize();
       window.addEventListener("resize", resize);
 
-      // No auto-rotation
       const controls = globe.controls() as {
         autoRotate: boolean;
         enableZoom: boolean;
@@ -115,7 +112,6 @@ export default function AirportMap({ favorites, recents }: AirportMapProps) {
       controls.enableDamping = true;
       controls.dampingFactor = 0.1;
 
-      // Make WebGL canvas transparent
       const renderer = globe.renderer();
       renderer.setClearColor(0x000000, 0);
 
