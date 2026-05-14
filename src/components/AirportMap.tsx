@@ -12,16 +12,13 @@ interface AirportMapProps {
   recents: string[];
 }
 
-const DARK_TILES =
-  "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
-const LIGHT_TILES =
-  "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png";
+// Satellite imagery (ESRI World Imagery — free with attribution)
+const SATELLITE_TILES =
+  "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
 
-/** Major airports: ICAO codes starting with common prefixes for big hubs */
-const MAJOR_PREFIXES = new Set([
-  // We'll use a size heuristic: airports whose name contains "International"
-  // or whose ICAO starts with certain patterns are shown at lower zoom levels
-]);
+// Labels overlay on top of satellite
+const LABELS_TILES =
+  "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}";
 
 function isMajor(a: Airport): boolean {
   const n = a.name.toLowerCase();
@@ -57,9 +54,8 @@ export default function AirportMap({ favorites, recents }: AirportMapProps) {
   const leafletMap = useRef<L.Map | null>(null);
   const markersLayer = useRef<L.LayerGroup | null>(null);
   const router = useRouter();
-  const [isDark, setIsDark] = useState(false);
+  const [ready, setReady] = useState(false);
 
-  // Filter airports with coordinates
   const airportsWithCoords = useMemo(
     () => AIRPORTS.filter((a) => a.lat != null && a.lon != null),
     []
@@ -68,36 +64,40 @@ export default function AirportMap({ favorites, recents }: AirportMapProps) {
   const favSet = useMemo(() => new Set(favorites), [favorites]);
   const recentSet = useMemo(() => new Set(recents), [recents]);
 
-  // Detect dark mode
-  useEffect(() => {
-    setIsDark(document.documentElement.classList.contains("dark"));
-    const observer = new MutationObserver(() => {
-      setIsDark(document.documentElement.classList.contains("dark"));
-    });
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ["class"],
-    });
-    return () => observer.disconnect();
-  }, []);
-
   // Init map
   useEffect(() => {
     if (!mapRef.current || leafletMap.current) return;
 
     const map = L.map(mapRef.current, {
-      center: [48, 10], // Europe center
-      zoom: 4,
-      minZoom: 2,
-      maxZoom: 12,
+      center: [46, 6],
+      zoom: 5,
+      minZoom: 3,
+      maxZoom: 14,
       zoomControl: false,
       attributionControl: false,
     });
+
+    // Satellite base layer
+    L.tileLayer(SATELLITE_TILES, {
+      maxZoom: 18,
+    }).addTo(map);
+
+    // Labels on top
+    L.tileLayer(LABELS_TILES, {
+      maxZoom: 18,
+    }).addTo(map);
+
+    // Attribution (required by ESRI)
+    L.control
+      .attribution({ position: "bottomleft", prefix: false })
+      .addAttribution("Esri, Maxar, Earthstar Geographics")
+      .addTo(map);
 
     L.control.zoom({ position: "bottomright" }).addTo(map);
 
     leafletMap.current = map;
     markersLayer.current = L.layerGroup().addTo(map);
+    setReady(true);
 
     return () => {
       map.remove();
@@ -105,25 +105,9 @@ export default function AirportMap({ favorites, recents }: AirportMapProps) {
     };
   }, []);
 
-  // Update tile layer when theme changes
-  useEffect(() => {
-    if (!leafletMap.current) return;
-    const map = leafletMap.current;
-
-    // Remove old tile layers
-    map.eachLayer((layer) => {
-      if (layer instanceof L.TileLayer) map.removeLayer(layer);
-    });
-
-    L.tileLayer(isDark ? DARK_TILES : LIGHT_TILES, {
-      maxZoom: 19,
-      subdomains: "abcd",
-    }).addTo(map);
-  }, [isDark]);
-
   // Render markers based on zoom level
   useEffect(() => {
-    if (!leafletMap.current || !markersLayer.current) return;
+    if (!ready || !leafletMap.current || !markersLayer.current) return;
     const map = leafletMap.current;
     const layer = markersLayer.current;
 
@@ -132,15 +116,12 @@ export default function AirportMap({ favorites, recents }: AirportMapProps) {
       const zoom = map.getZoom();
       const bounds = map.getBounds();
 
-      // Zoom-dependent filtering for performance
       let filtered: Airport[];
       if (zoom < 4) {
-        // Very zoomed out: only favorites, recents, and major airports
         filtered = airportsWithCoords.filter(
           (a) => favSet.has(a.icao) || recentSet.has(a.icao) || isMajor(a)
         );
       } else if (zoom < 6) {
-        // Medium zoom: show airports in view
         filtered = airportsWithCoords.filter(
           (a) =>
             bounds.contains([a.lat!, a.lon!]) ||
@@ -148,7 +129,6 @@ export default function AirportMap({ favorites, recents }: AirportMapProps) {
             recentSet.has(a.icao)
         );
       } else {
-        // Zoomed in: show all in view
         filtered = airportsWithCoords.filter((a) =>
           bounds.contains([a.lat!, a.lon!])
         );
@@ -158,35 +138,39 @@ export default function AirportMap({ favorites, recents }: AirportMapProps) {
         const isFav = favSet.has(airport.icao);
         const isRecent = recentSet.has(airport.icao);
 
-        let color: string;
+        let fillColor: string;
+        let strokeColor: string;
         let radius: number;
-        let fillOpacity: number;
+        let weight: number;
 
         if (isFav) {
-          color = isDark ? "#FBBF24" : "#D97706"; // warm/gold
-          radius = zoom < 6 ? 5 : 6;
-          fillOpacity = 0.9;
+          fillColor = "#FBBF24";
+          strokeColor = "#92400E";
+          radius = zoom < 6 ? 5 : 7;
+          weight = 2;
         } else if (isRecent) {
-          color = isDark ? "#38BDF8" : "#0284C7"; // accent
-          radius = zoom < 6 ? 4 : 5;
-          fillOpacity = 0.8;
+          fillColor = "#38BDF8";
+          strokeColor = "#0369A1";
+          radius = zoom < 6 ? 4 : 6;
+          weight = 1.5;
         } else {
-          color = isDark ? "#5A6675" : "#94A3B8"; // muted
-          radius = zoom < 6 ? 2.5 : 3.5;
-          fillOpacity = 0.6;
+          fillColor = "#FFFFFF";
+          strokeColor = "rgba(0,0,0,0.4)";
+          radius = zoom < 6 ? 2.5 : 4;
+          weight = 1;
         }
 
         const marker = L.circleMarker([airport.lat!, airport.lon!], {
           radius,
-          color: "transparent",
-          fillColor: color,
-          fillOpacity,
+          color: strokeColor,
+          weight,
+          fillColor,
+          fillOpacity: 0.9,
           interactive: true,
         });
 
-        // Tooltip
         marker.bindTooltip(
-          `<div style="font-family:monospace;font-size:12px;font-weight:700;letter-spacing:0.05em">${airport.icao}</div><div style="font-size:11px;opacity:0.8">${airport.name}</div>`,
+          `<span style="font-family:ui-monospace,monospace;font-size:13px;font-weight:800;letter-spacing:0.06em;color:#0284C7">${airport.icao}</span><br/><span style="font-size:11px;color:#475569">${airport.name}</span>`,
           {
             direction: "top",
             offset: [0, -8],
@@ -208,24 +192,24 @@ export default function AirportMap({ favorites, recents }: AirportMapProps) {
     return () => {
       map.off("zoomend moveend", renderMarkers);
     };
-  }, [airportsWithCoords, favSet, recentSet, isDark, router]);
+  }, [ready, airportsWithCoords, favSet, recentSet, router]);
 
   return (
-    <div className="relative w-full overflow-hidden rounded-xl border border-[var(--border)]">
-      <div ref={mapRef} className="h-[50vh] min-h-[300px] w-full" />
+    <div className="relative w-full overflow-hidden rounded-xl border border-[var(--border)] shadow-lg">
+      <div ref={mapRef} className="h-[55vh] min-h-[350px] w-full" />
       {/* Legend */}
-      <div className="absolute bottom-10 left-3 z-[1000] flex flex-col gap-1 rounded-lg border border-[var(--border)] bg-[var(--surface)]/90 px-2.5 py-2 text-[10px] backdrop-blur-sm">
-        <div className="flex items-center gap-1.5">
-          <span className="inline-block h-2 w-2 rounded-full bg-[var(--warm)]" />
-          <span className="text-[var(--text-muted)]">Favoris</span>
+      <div className="absolute bottom-10 left-3 z-[1000] flex flex-col gap-1.5 rounded-lg bg-black/60 px-3 py-2.5 text-[10px] backdrop-blur-sm">
+        <div className="flex items-center gap-2">
+          <span className="inline-block h-2.5 w-2.5 rounded-full border border-amber-800 bg-amber-400" />
+          <span className="text-white/80">Favoris</span>
         </div>
-        <div className="flex items-center gap-1.5">
-          <span className="inline-block h-2 w-2 rounded-full bg-[var(--accent)]" />
-          <span className="text-[var(--text-muted)]">Récents</span>
+        <div className="flex items-center gap-2">
+          <span className="inline-block h-2.5 w-2.5 rounded-full border border-sky-700 bg-sky-400" />
+          <span className="text-white/80">Récents</span>
         </div>
-        <div className="flex items-center gap-1.5">
-          <span className="inline-block h-1.5 w-1.5 rounded-full bg-[var(--text-muted)]" />
-          <span className="text-[var(--text-muted)]">Aéroports</span>
+        <div className="flex items-center gap-2">
+          <span className="inline-block h-2 w-2 rounded-full border border-black/30 bg-white" />
+          <span className="text-white/80">Aéroports</span>
         </div>
       </div>
     </div>
