@@ -1,12 +1,26 @@
 /** Airport identity */
 export interface Airport {
   icao: string;
+  iata?: string;
   name: string;
   city: string;
   country: string;
   lat?: number;
   lon?: number;
+  elevation_ft?: number;
+  frequencies?: {
+    atisVhf_mhz?: string;
+    atisPhone?: string;
+    twr_mhz?: string;
+    gnd_mhz?: string;
+    app_mhz?: string;
+  };
+  atisHours?: "H24" | string;
+  nearestMetarIcao?: string;
 }
+
+/** Service tier — determines page layout variant */
+export type ServiceTier = 1 | 2 | 3 | 4;
 
 /** Parsed key fields extracted from an ATIS message */
 export interface AtisFields {

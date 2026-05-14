@@ -12,83 +12,94 @@ import {
   updateSettings,
   addRecent,
   fetchLiveAtis,
-  liveMessageToAtisRecord,
 } from "@/lib/store";
-import type { AirportData } from "@/lib/types";
+import type { LiveAtisResponse } from "@/lib/store";
+import type { Airport } from "@/lib/types";
+import type { ServiceTier } from "@/lib/types";
 import { findAirport } from "@/lib/airports";
+import { getServiceTier } from "@/lib/datis-coverage";
+import { parseDatis } from "@/lib/datis-parser";
+import type { DatisFields } from "@/lib/datis-parser";
 import { WarningBanner } from "@/components/WarningBanner";
 import { FirstLaunchDisclaimer } from "@/components/FirstLaunchDisclaimer";
 import { AirportHeader } from "@/components/AirportHeader";
-import { AtisCard } from "@/components/AtisCard";
+import { DatisCard } from "@/components/DatisCard";
+import { WindComponentsStrip } from "@/components/WindComponentsStrip";
+import { NoAtisNotice } from "@/components/NoAtisNotice";
+import { PromotedMetarCard } from "@/components/PromotedMetarCard";
+import { DataAccordion } from "@/components/DataAccordion";
 import { RawDataBlock } from "@/components/RawDataBlock";
-import { WeatherBlock } from "@/components/WeatherBlock";
+import { DecodedMetar } from "@/components/DecodedMetar";
+import { DecodedTaf } from "@/components/DecodedTaf";
 import { PageFooter } from "@/components/PageFooter";
 import { Meteogram } from "@/components/Meteogram";
 import { NotamBlock } from "@/components/NotamBlock";
 import { SunTimes } from "@/components/SunTimes";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { RunwayDiagram } from "@/components/RunwayDiagram";
+
+interface ParsedMessage {
+  fields: DatisFields;
+  raw: string;
+  receivedAt: string;
+}
 
 export default function AtisPage() {
   const params = useParams<{ icao: string }>();
   const router = useRouter();
   const icao = params.icao?.toUpperCase() ?? "";
 
-  const [data, setData] = useState<AirportData | null>(null);
+  const [liveResponse, setLiveResponse] = useState<LiveAtisResponse | null>(null);
+  const [airport, setAirport] = useState<Airport | null>(null);
+  const [parsedMessages, setParsedMessages] = useState<ParsedMessage[]>([]);
+  const [tier, setTier] = useState<ServiceTier>(3);
   const [notFound, setNotFound] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [isLive, setIsLive] = useState(false);
   const [disclaimerOpen, setDisclaimerOpen] = useState(false);
   const [weatherMode, setWeatherMode] = useState<"raw" | "decoded">("raw");
 
   const loadData = useCallback(async () => {
     setLoading(true);
 
-    // Try live API first
-    const liveResponse = await fetchLiveAtis(icao);
+    const response = await fetchLiveAtis(icao);
+    setLiveResponse(response);
 
-    // Build METAR/TAF from live response
-    const liveMetar = liveResponse?.metar
-      ? { icao: liveResponse.metar.icao, raw: liveResponse.metar.raw, receivedAt: liveResponse.metar.fetchedAt }
-      : null;
-    const liveTaf = liveResponse?.taf
-      ? { icao: liveResponse.taf.icao, raw: liveResponse.taf.raw, receivedAt: liveResponse.taf.fetchedAt }
-      : null;
-
-    if (liveResponse && liveResponse.messages && liveResponse.messages.length > 0) {
-      // We got live ATIS data — convert all messages (ARR + DEP)
-      const airport = liveResponse.airport
-        ? liveResponse.airport
+    if (response) {
+      const apt: Airport = response.airport
+        ? response.airport
         : findAirport(icao) ?? { icao, name: icao, city: "", country: "" };
+      setAirport(apt);
 
-      const atisRecords = liveResponse.messages.map(liveMessageToAtisRecord);
+      // Determine tier
+      const serviceTier = getServiceTier(icao, apt);
+      // If tier 1 but no ATIS messages received, still show as tier 1 (data might be stale)
+      setTier(serviceTier);
 
-      setData({
-        airport,
-        atis: atisRecords,
-        metar: liveMetar,
-        taf: liveTaf,
-      });
+      // Parse D-ATIS messages
+      if (response.messages && response.messages.length > 0) {
+        const parsed = response.messages.map((msg) => ({
+          fields: parseDatis(msg.body, { letter: msg.letter, type: msg.type }),
+          raw: msg.raw.replace(/\t/g, " ").replace(/\r/g, ""),
+          receivedAt: msg.timestamp,
+        }));
+        setParsedMessages(parsed);
+      } else {
+        setParsedMessages([]);
+      }
+
       setNotFound(false);
-      setIsLive(true);
       addRecent(icao);
     } else {
-      // No live ATIS — show airport with live METAR/TAF if available
-      const airport = liveResponse?.airport ?? findAirport(icao);
-      if (airport || liveMetar || liveTaf) {
-        setData({
-          airport: airport ?? { icao, name: icao, city: "", country: "" },
-          atis: [],
-          metar: liveMetar,
-          taf: liveTaf,
-        });
+      const apt = findAirport(icao);
+      if (apt) {
+        setAirport(apt);
+        setTier(getServiceTier(icao, apt));
         setNotFound(false);
         addRecent(icao);
       } else {
         setNotFound(true);
-        setData(null);
+        setAirport(null);
       }
-      setIsLive(false);
+      setParsedMessages([]);
     }
 
     setLoading(false);
@@ -109,68 +120,72 @@ export default function AtisPage() {
     });
   };
 
-  const handleRefresh = () => {
-    loadData();
-  };
+  // Shared header
+  const header = (
+    <header className="sticky top-0 z-40 flex items-center gap-3 border-b border-[var(--border)] bg-[var(--bg)]/95 px-5 py-3 backdrop-blur-sm">
+      <Link
+        href="/"
+        className="-ml-1 p-1 text-[var(--text-muted)] transition-colors hover:text-[var(--accent)]"
+      >
+        <ArrowLeft className="h-5 w-5" />
+      </Link>
+      <Wordmark size="sm" />
+      <span className="font-mono text-xs font-medium text-[var(--text-muted)]">
+        · {icao}
+      </span>
+      {tier !== 1 && (
+        <TierBadge tier={tier} />
+      )}
+      <div className="ml-auto flex items-center gap-3">
+        <IcaoInput />
+        <UtcClock />
+        <ThemeToggle />
+      </div>
+    </header>
+  );
 
   // Loading skeleton
   if (loading) {
     return (
       <>
-        <header className="sticky top-0 z-40 flex items-center gap-3 border-b border-[var(--border)] bg-[var(--bg)]/95 px-5 py-3 backdrop-blur-sm">
-          <Link href="/" className="p-1 -ml-1 text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors">
-            <ArrowLeft className="h-5 w-5" />
-          </Link>
-          <Wordmark size="sm" />
-          <span className="font-mono text-xs font-medium text-[var(--text-muted)]">
-            · {icao}
-          </span>
-        </header>
+        {header}
         <main className="flex flex-1 flex-col gap-5 px-5 py-6">
-          {/* Airport header skeleton */}
           <div className="space-y-2">
             <div className="h-7 w-24 animate-pulse rounded bg-[var(--surface-elevated)]" />
             <div className="h-4 w-48 animate-pulse rounded bg-[var(--surface-elevated)]" />
           </div>
-          {/* ATIS card skeleton */}
           <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-5">
             <div className="flex flex-col items-center gap-3">
-              <div className="h-20 w-20 animate-pulse rounded-full bg-[var(--surface-elevated)]" />
-              <div className="h-4 w-20 animate-pulse rounded bg-[var(--surface-elevated)]" />
+              <div className="h-14 w-14 animate-pulse rounded-[10px] bg-[var(--surface-elevated)]" />
+              <div className="h-4 w-32 animate-pulse rounded bg-[var(--surface-elevated)]" />
             </div>
             <div className="mt-5 grid grid-cols-2 gap-2.5">
               {[0, 1, 2, 3].map((i) => (
-                <div key={i} className="h-14 animate-pulse rounded-md bg-[var(--surface-elevated)]" />
+                <div
+                  key={i}
+                  className="h-14 animate-pulse rounded-md bg-[var(--surface-elevated)]"
+                />
               ))}
             </div>
-          </div>
-          {/* Weather skeleton */}
-          <div className="space-y-2">
-            <div className="h-3 w-16 animate-pulse rounded bg-[var(--surface-elevated)]" />
-            <div className="h-16 animate-pulse rounded-md bg-[var(--surface-elevated)]" />
           </div>
         </main>
       </>
     );
   }
 
-  // Unknown airport / no data at all
-  if (notFound && !data) {
+  // Not found
+  if (notFound && !airport) {
     return (
       <>
-        <header className="flex items-center gap-3 px-5 py-4">
-          <Link href="/" className="text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors">
-            <ArrowLeft className="h-5 w-5" />
-          </Link>
-          <Wordmark size="sm" />
-        </header>
+        {header}
         <main className="flex flex-1 flex-col items-center justify-center gap-4 px-5 pb-16 text-center">
           <Plane className="h-10 w-10 text-[var(--text-muted)]" />
           <p className="font-mono text-lg font-semibold text-[var(--text-primary)]">
             {icao}
           </p>
           <p className="max-w-xs text-sm text-[var(--text-secondary)]">
-            Aéroport non trouvé dans notre base. Vérifie le code ICAO (4 lettres).
+            Aéroport non trouvé dans notre base. Vérifie le code ICAO (4
+            lettres).
           </p>
           <button
             onClick={() => router.push("/")}
@@ -183,9 +198,21 @@ export default function AtisPage() {
     );
   }
 
-  if (!data) return null;
+  if (!airport) return null;
 
-  const hasAtis = data.atis.length > 0;
+  const metar = liveResponse?.metar;
+  const taf = liveResponse?.taf;
+  const hasAtis = parsedMessages.length > 0;
+  const allFields = parsedMessages.map((m) => m.fields);
+
+  // METAR preview for accordion
+  const metarPreview = metar
+    ? metar.raw.slice(metar.raw.indexOf("Z") + 2, metar.raw.indexOf("Z") + 40) + "…"
+    : undefined;
+
+  // Sun times preview
+  const sunPreview =
+    airport.lat != null && airport.lon != null ? "Lever · Coucher" : undefined;
 
   return (
     <>
@@ -196,95 +223,251 @@ export default function AtisPage() {
         />
       )}
 
-      {/* Sticky header */}
-      <header className="sticky top-0 z-40 flex items-center gap-3 border-b border-[var(--border)] bg-[var(--bg)]/95 px-5 py-3 backdrop-blur-sm">
-        <Link href="/" className="p-1 -ml-1 text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors">
-          <ArrowLeft className="h-5 w-5" />
-        </Link>
-        <Wordmark size="sm" />
-        <span className="font-mono text-xs font-medium text-[var(--text-muted)]">
-          · {icao}
-        </span>
-        <div className="ml-auto flex items-center gap-3">
-          <IcaoInput />
-          <UtcClock />
-          <ThemeToggle />
-        </div>
-      </header>
+      {header}
 
-      {/* Warning banner */}
       <WarningBanner onClickDetails={() => setDisclaimerOpen(true)} />
 
-      {/* Airport header */}
-      <AirportHeader airport={data.airport} />
+      <AirportHeader airport={airport} />
 
-      {/* Sunrise / Sunset */}
-      {data.airport.lat != null && data.airport.lon != null && (
-        <SunTimes lat={data.airport.lat} lon={data.airport.lon} />
+      {airport.lat != null && airport.lon != null && (
+        <SunTimes lat={airport.lat} lon={airport.lon} />
       )}
 
-      <main className="flex flex-1 flex-col gap-5 pt-2 pb-4">
-        {/* ATIS Cards — one per message (ARR + DEP) */}
-        {hasAtis ? (
-          data.atis.map((atis, i) => (
-            <div key={i}>
-              <AtisCard atis={atis} />
-              <div className="mx-5 mt-3">
-                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
-                  Raw ATIS{atis.fields.type ? ` ${atis.fields.type}` : ""}
-                </h3>
-                <RawDataBlock raw={atis.raw} />
+      <main className="flex flex-1 flex-col gap-4 pt-2 pb-4">
+        {/* ── TIER 1: D-ATIS ── */}
+        {tier === 1 && (
+          <>
+            {hasAtis ? (
+              parsedMessages.map((msg, i) => (
+                <DatisCard
+                  key={i}
+                  fields={msg.fields}
+                  raw={msg.raw}
+                  receivedAt={msg.receivedAt}
+                />
+              ))
+            ) : (
+              <div className="mx-3.5 rounded-[10px] border-[0.5px] border-[var(--border)] bg-[var(--surface)] p-5 text-center">
+                <p className="text-sm text-[var(--text-secondary)]">
+                  Pas de D-ATIS récent capté pour ce terrain.
+                </p>
+                <p className="mt-1 text-xs text-[var(--text-muted)]">
+                  Réessaye dans quelques minutes ou consulte l&apos;ATIS voix.
+                </p>
               </div>
-            </div>
-          ))
-        ) : (
-          <div className="mx-5 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-5 text-center">
-            <p className="text-sm text-[var(--text-secondary)]">
-              Pas de D-ATIS récent capté pour ce terrain.
-            </p>
-            <p className="mt-1 text-xs text-[var(--text-muted)]">
-              Réessaye dans quelques minutes ou consulte le voix ATIS.
-            </p>
-          </div>
+            )}
+
+            {/* Wind components strip */}
+            {hasAtis && (
+              <WindComponentsStrip
+                icao={icao}
+                allFields={allFields}
+                metarRaw={metar?.raw}
+              />
+            )}
+
+            {/* Accordions */}
+            {metar && (
+              <DataAccordion label="METAR" preview={metarPreview}>
+                <div className="p-3">
+                  {weatherMode === "raw" ? (
+                    <RawDataBlock raw={metar.raw} />
+                  ) : (
+                    <DecodedMetar raw={metar.raw} />
+                  )}
+                  <button
+                    onClick={toggleWeatherMode}
+                    className="mt-2 font-mono text-[10px] text-[var(--accent)] hover:underline"
+                  >
+                    {weatherMode === "raw" ? "Décoder" : "Voir brut"}
+                  </button>
+                </div>
+              </DataAccordion>
+            )}
+
+            {taf && (
+              <DataAccordion label="TAF" preview="Prévisions">
+                <div className="p-3">
+                  {weatherMode === "raw" ? (
+                    <RawDataBlock raw={taf.raw} />
+                  ) : (
+                    <DecodedTaf raw={taf.raw} />
+                  )}
+                  <button
+                    onClick={toggleWeatherMode}
+                    className="mt-2 font-mono text-[10px] text-[var(--accent)] hover:underline"
+                  >
+                    {weatherMode === "raw" ? "Décoder" : "Voir brut"}
+                  </button>
+                </div>
+              </DataAccordion>
+            )}
+
+            <DataAccordion label="NOTAMs" preview="Actifs">
+              <div className="p-3">
+                <NotamBlock icao={icao} />
+              </div>
+            </DataAccordion>
+
+            {airport.lat != null && airport.lon != null && (
+              <DataAccordion label="Forecast" preview="Météogramme ECMWF · 36h">
+                <div className="p-3">
+                  <Meteogram lat={airport.lat} lon={airport.lon} />
+                </div>
+              </DataAccordion>
+            )}
+
+            {airport.lat != null && airport.lon != null && (
+              <DataAccordion label="Éphéméride" preview={sunPreview}>
+                <div className="p-3">
+                  <SunTimes lat={airport.lat} lon={airport.lon} />
+                </div>
+              </DataAccordion>
+            )}
+          </>
         )}
 
-        {/* Runway wind components */}
-        {hasAtis && <RunwayDiagram icao={icao} atisMessages={data.atis} metarRaw={data.metar?.raw} />}
+        {/* ── TIER 2: ATIS Voix ── */}
+        {tier === 2 && (
+          <>
+            <NoAtisNotice airport={airport} tier={2} />
 
-        {/* METAR */}
-        {data.metar && (
-          <WeatherBlock
-            label="METAR"
-            raw={data.metar.raw}
-            receivedAt={data.metar.receivedAt}
-            type="metar"
-            mode={weatherMode}
-            onToggle={toggleWeatherMode}
-          />
+            {metar && (
+              <PromotedMetarCard raw={metar.raw} receivedAt={metar.fetchedAt} />
+            )}
+
+            {taf && (
+              <DataAccordion label="TAF" preview="Prévisions" defaultOpen>
+                <div className="p-3">
+                  {weatherMode === "raw" ? (
+                    <RawDataBlock raw={taf.raw} />
+                  ) : (
+                    <DecodedTaf raw={taf.raw} />
+                  )}
+                  <button
+                    onClick={toggleWeatherMode}
+                    className="mt-2 font-mono text-[10px] text-[var(--accent)] hover:underline"
+                  >
+                    {weatherMode === "raw" ? "Décoder" : "Voir brut"}
+                  </button>
+                </div>
+              </DataAccordion>
+            )}
+
+            {/* Wind strip if METAR wind available */}
+            {metar && allFields.length === 0 && (
+              <WindComponentsStrip
+                icao={icao}
+                allFields={[]}
+                metarRaw={metar.raw}
+              />
+            )}
+
+            <DataAccordion label="NOTAMs" preview="Actifs">
+              <div className="p-3">
+                <NotamBlock icao={icao} />
+              </div>
+            </DataAccordion>
+
+            {airport.lat != null && airport.lon != null && (
+              <DataAccordion label="Forecast" preview="Météogramme ECMWF · 36h">
+                <div className="p-3">
+                  <Meteogram lat={airport.lat} lon={airport.lon} />
+                </div>
+              </DataAccordion>
+            )}
+          </>
         )}
 
-        {/* TAF */}
-        {data.taf && (
-          <WeatherBlock
-            label="TAF"
-            raw={data.taf.raw}
-            receivedAt={data.taf.receivedAt}
-            type="taf"
-            mode={weatherMode}
-            onToggle={toggleWeatherMode}
-          />
+        {/* ── TIER 3: METAR/TAF seuls ── */}
+        {tier === 3 && (
+          <>
+            <NoAtisNotice airport={airport} tier={3} />
+
+            {metar && (
+              <PromotedMetarCard raw={metar.raw} receivedAt={metar.fetchedAt} />
+            )}
+
+            {taf && (
+              <DataAccordion label="TAF" preview="Prévisions" defaultOpen>
+                <div className="p-3">
+                  {weatherMode === "raw" ? (
+                    <RawDataBlock raw={taf.raw} />
+                  ) : (
+                    <DecodedTaf raw={taf.raw} />
+                  )}
+                  <button
+                    onClick={toggleWeatherMode}
+                    className="mt-2 font-mono text-[10px] text-[var(--accent)] hover:underline"
+                  >
+                    {weatherMode === "raw" ? "Décoder" : "Voir brut"}
+                  </button>
+                </div>
+              </DataAccordion>
+            )}
+
+            <DataAccordion label="NOTAMs" preview="Actifs">
+              <div className="p-3">
+                <NotamBlock icao={icao} />
+              </div>
+            </DataAccordion>
+
+            {airport.lat != null && airport.lon != null && (
+              <DataAccordion label="Forecast" preview="Météogramme ECMWF · 36h">
+                <div className="p-3">
+                  <Meteogram lat={airport.lat} lon={airport.lon} />
+                </div>
+              </DataAccordion>
+            )}
+          </>
         )}
 
-        {/* Meteogram */}
-        {data.airport.lat != null && data.airport.lon != null && (
-          <Meteogram lat={data.airport.lat} lon={data.airport.lon} />
-        )}
+        {/* ── TIER 4: Pas de météo ── */}
+        {tier === 4 && (
+          <>
+            <NoAtisNotice airport={airport} tier={4} />
 
-        {/* NOTAMs */}
-        <NotamBlock icao={icao} />
+            {/* Nearest METAR reference — would need nearestMetarIcao in airport data */}
+            {metar && (
+              <PromotedMetarCard raw={metar.raw} receivedAt={metar.fetchedAt} />
+            )}
+
+            <DataAccordion label="NOTAMs" preview="Actifs">
+              <div className="p-3">
+                <NotamBlock icao={icao} />
+              </div>
+            </DataAccordion>
+          </>
+        )}
       </main>
 
-      <PageFooter onRefresh={handleRefresh} />
+      <PageFooter onRefresh={loadData} />
     </>
+  );
+}
+
+function TierBadge({ tier }: { tier: ServiceTier }) {
+  const labels: Record<ServiceTier, string> = {
+    1: "D-ATIS",
+    2: "ATIS VOIX",
+    3: "METAR ONLY",
+    4: "VFR ONLY",
+  };
+  const colors: Record<ServiceTier, string> = {
+    1: "var(--fresh)",
+    2: "var(--accent)",
+    3: "var(--text-muted)",
+    4: "var(--text-muted)",
+  };
+  return (
+    <span
+      className="rounded-full px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-wider"
+      style={{
+        background: `color-mix(in srgb, ${colors[tier]} 12%, transparent)`,
+        color: colors[tier],
+      }}
+    >
+      {labels[tier]}
+    </span>
   );
 }
