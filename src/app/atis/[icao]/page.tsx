@@ -249,7 +249,7 @@ export default function AtisPage() {
         )}
 
         {/* Runway wind components */}
-        {hasAtis && <RunwayDiagram icao={icao} atisMessages={data.atis} />}
+        {hasAtis && <RunwayDiagram icao={icao} atisMessages={data.atis} metarRaw={data.metar?.raw} />}
 
         {/* METAR */}
         {data.metar && (

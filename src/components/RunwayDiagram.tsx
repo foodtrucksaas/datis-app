@@ -6,6 +6,7 @@ import type { AtisRecord } from "@/lib/types";
 interface RunwayDiagramProps {
   icao: string;
   atisMessages: AtisRecord[];
+  metarRaw?: string;
 }
 
 interface RunwayData {
@@ -27,6 +28,14 @@ function parseWind(wind: string): { dir: number; speed: number; gust?: number } 
   const m = wind.match(/(\d{3})°\/(\d+)\s*kt(?:\s*G(\d+))?/i);
   if (!m) return null;
   return { dir: parseInt(m[1]), speed: parseInt(m[2]), gust: m[3] ? parseInt(m[3]) : undefined };
+}
+
+/** Parse wind from raw METAR string like "24009KT" or "24009G15KT" */
+function parseMetarWind(metar: string): { dir: number; speed: number; gust?: number } | null {
+  if (!metar) return null;
+  const m = metar.match(/\b(\d{3})(\d{2,3})(G(\d{2,3}))?KT\b/);
+  if (!m) return null;
+  return { dir: parseInt(m[1]), speed: parseInt(m[2]), gust: m[4] ? parseInt(m[4]) : undefined };
 }
 
 function windComponents(windDir: number, windSpeed: number, rwyHdg: number) {
@@ -53,12 +62,15 @@ function latLonToXY(
   return { x: R * dLon * cosLat, y: -R * dLat }; // y inverted for SVG
 }
 
-export function RunwayDiagram({ icao, atisMessages }: RunwayDiagramProps) {
+export function RunwayDiagram({ icao, atisMessages, metarRaw }: RunwayDiagramProps) {
   const [runways, setRunways] = useState<RunwayData[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const windStr = atisMessages.find((a) => a.fields.wind && a.fields.wind !== "N/A")?.fields.wind ?? "";
-  const wind = parseWind(windStr);
+  // Prefer METAR wind, fallback to ATIS wind
+  const metarWind = parseMetarWind(metarRaw ?? "");
+  const atisWindStr = atisMessages.find((a) => a.fields.wind && a.fields.wind !== "N/A")?.fields.wind ?? "";
+  const wind = metarWind ?? parseWind(atisWindStr);
+  const windSource = metarWind ? "METAR" : "ATIS";
 
   const arrRunways = new Set<string>();
   const depRunways = new Set<string>();
@@ -93,6 +105,7 @@ export function RunwayDiagram({ icao, atisMessages }: RunwayDiagramProps) {
         <span className="font-mono">
           {wind.dir}° / {wind.speed} kt{wind.gust ? ` G${wind.gust}` : ""}
         </span>
+        <span className="text-[var(--text-muted)] text-[10px]">({windSource})</span>
       </div>
 
       {/* Airport plan */}
@@ -241,9 +254,9 @@ function AirportPlan({
         {svgRunways.map((r) => {
           const a = toSvg(r.le);
           const b = toSvg(r.he);
-          const rwyWidth = Math.max(u * 0.8, r.width_ft * 0.3048 * scale * 0.6);
-          const color = r.isActive ? "var(--text-primary)" : "var(--text-muted)";
-          const opacity = r.isActive ? 0.7 : 0.25;
+          const rwyWidth = Math.max(u * 1.5, r.width_ft * 0.3048 * scale);
+          const color = r.isActive ? "var(--text-primary)" : "var(--text-secondary)";
+          const opacity = r.isActive ? 1 : 0.5;
 
           const dx = b.x - a.x;
           const dy = b.y - a.y;
@@ -332,16 +345,16 @@ function AirportPlan({
 
               {/* Dimensions */}
               <text
-                x={(a.x + b.x) / 2 + (-uy) * (rwyWidth / 2 + u * 2)}
-                y={(a.y + b.y) / 2 + ux2 * (rwyWidth / 2 + u * 2)}
+                x={(a.x + b.x) / 2 + (-uy) * (rwyWidth / 2 + u * 2.5)}
+                y={(a.y + b.y) / 2 + ux2 * (rwyWidth / 2 + u * 2.5)}
                 textAnchor="middle"
                 dominantBaseline="central"
-                fontSize={u * 1}
+                fontSize={u * 1.2}
                 fontFamily="var(--font-mono), monospace"
                 fill="var(--text-muted)"
-                opacity="0.5"
+                opacity="0.7"
               >
-                {ftToM(r.length_ft)}m
+                {ftToM(r.length_ft)} x {ftToM(r.width_ft)} m
               </text>
             </g>
           );

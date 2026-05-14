@@ -18,7 +18,7 @@ const RUNWAYS_CSV_URL =
   "https://davidmegginson.github.io/ourairports-data/runways.csv";
 
 let cache: Map<string, RunwayData[]> | null = null;
-let cacheTimestamp = 0;
+let cacheTimestamp = 0; // Reset on deploy
 const CACHE_TTL = 24 * 60 * 60 * 1000; // 24h
 
 async function loadRunways(): Promise<Map<string, RunwayData[]>> {
