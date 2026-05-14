@@ -125,27 +125,10 @@ export default function AirportMap({ favorites, recents }: AirportMapProps) {
   }, [points, handleClick]);
 
   return (
-    <div className="relative w-full overflow-hidden rounded-xl border border-[var(--border)]">
-      <div
-        ref={containerRef}
-        className="h-[60vh] min-h-[400px] w-full cursor-grab active:cursor-grabbing"
-        style={{ background: "#000010" }}
-      />
-      {/* Legend */}
-      <div className="absolute bottom-4 left-4 z-10 flex flex-col gap-1.5 rounded-lg bg-black/50 px-3 py-2.5 text-[10px] backdrop-blur-md border border-white/10">
-        <div className="flex items-center gap-2">
-          <span className="inline-block h-2.5 w-2.5 rounded-full bg-amber-400 shadow-[0_0_6px_#FBBF24]" />
-          <span className="text-white/70">Favoris</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="inline-block h-2.5 w-2.5 rounded-full bg-sky-400 shadow-[0_0_6px_#38BDF8]" />
-          <span className="text-white/70">Récents</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="inline-block h-1.5 w-1.5 rounded-full bg-white/60" />
-          <span className="text-white/70">Aéroports</span>
-        </div>
-      </div>
-    </div>
+    <div
+      ref={containerRef}
+      className="h-full w-full"
+      style={{ background: "#000010" }}
+    />
   );
 }

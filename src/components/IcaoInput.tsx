@@ -6,7 +6,12 @@ import { Search } from "lucide-react";
 import { searchAirports } from "@/lib/airports";
 import type { Airport } from "@/lib/types";
 
-export function IcaoInput() {
+interface IcaoInputProps {
+  variant?: "light" | "dark";
+}
+
+export function IcaoInput({ variant = "light" }: IcaoInputProps) {
+  const isDark = variant === "dark";
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Airport[]>([]);
@@ -82,7 +87,7 @@ export function IcaoInput() {
   return (
     <div className="relative w-full max-w-md">
       <div className="relative">
-        <Search className="absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-[var(--text-muted)]" />
+        <Search className={`absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 ${isDark ? "text-white/30" : "text-[var(--text-muted)]"}`} />
         <input
           ref={inputRef}
           type="text"
@@ -103,18 +108,22 @@ export function IcaoInput() {
           maxLength={4}
           autoComplete="off"
           spellCheck={false}
-          className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] py-3.5 pl-11 pr-4
-            font-mono text-lg tracking-widest text-[var(--text-primary)] placeholder:font-sans
-            placeholder:text-sm placeholder:tracking-normal placeholder:text-[var(--text-muted)]
-            focus:border-[var(--accent-dim)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-dim)]"
+          className={`w-full rounded-xl py-3.5 pl-11 pr-4
+            font-mono text-lg tracking-widest placeholder:font-sans
+            placeholder:text-sm placeholder:tracking-normal
+            focus:outline-none focus:ring-1 ${
+              isDark
+                ? "border border-white/15 bg-white/8 text-white placeholder:text-white/30 backdrop-blur-md focus:border-sky-400/50 focus:ring-sky-400/30"
+                : "border border-[var(--border)] bg-[var(--surface)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent-dim)] focus:ring-[var(--accent-dim)]"
+            }`}
         />
         {query.length > 0 && query.length < 4 && (
-          <span className="absolute right-3.5 top-1/2 -translate-y-1/2 font-mono text-xs text-[var(--text-muted)]">
+          <span className={`absolute right-3.5 top-1/2 -translate-y-1/2 font-mono text-xs ${isDark ? "text-white/30" : "text-[var(--text-muted)]"}`}>
             {query.length}/4
           </span>
         )}
         {query.length === 4 && (
-          <span className="absolute right-3.5 top-1/2 -translate-y-1/2 font-mono text-xs text-[var(--fresh)]">
+          <span className={`absolute right-3.5 top-1/2 -translate-y-1/2 font-mono text-xs ${isDark ? "text-sky-400" : "text-[var(--fresh)]"}`}>
             ↵
           </span>
         )}
@@ -123,26 +132,33 @@ export function IcaoInput() {
       {open && (
         <ul
           ref={listRef}
-          className="absolute z-40 mt-1.5 w-full overflow-auto rounded-lg border border-[var(--border)] bg-[var(--surface-elevated)] py-1 shadow-xl max-h-64"
+          className={`absolute z-40 mt-1.5 w-full overflow-auto rounded-xl py-1 shadow-2xl max-h-64 ${
+            isDark
+              ? "border border-white/15 bg-black/80 backdrop-blur-xl"
+              : "border border-[var(--border)] bg-[var(--surface-elevated)]"
+          }`}
         >
           {results.map((airport, i) => (
             <li
               key={airport.icao}
               onMouseDown={() => navigate(airport.icao)}
               className={`flex cursor-pointer items-center gap-3 px-3.5 py-2.5 text-sm transition-colors
-                ${
-                  i === selectedIndex
+                ${isDark
+                  ? i === selectedIndex
+                    ? "bg-white/10 text-white"
+                    : "text-white/70 hover:bg-white/5"
+                  : i === selectedIndex
                     ? "bg-[var(--accent)]/10 text-[var(--text-primary)]"
                     : "text-[var(--text-secondary)] hover:bg-[var(--surface)]"
                 }`}
             >
-              <span className="shrink-0 font-mono text-sm font-semibold text-[var(--accent)]">
+              <span className={`shrink-0 font-mono text-sm font-semibold ${isDark ? "text-sky-400" : "text-[var(--accent)]"}`}>
                 {airport.icao}
               </span>
               <span className="truncate">
                 {airport.name}
               </span>
-              <span className="ml-auto shrink-0 text-xs text-[var(--text-muted)]">
+              <span className={`ml-auto shrink-0 text-xs ${isDark ? "text-white/30" : "text-[var(--text-muted)]"}`}>
                 {airport.country}
               </span>
             </li>
