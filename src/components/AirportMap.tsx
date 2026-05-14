@@ -14,8 +14,11 @@ interface GlobePoint {
   lng: number;
   icao: string;
   name: string;
-  kind: "fav" | "recent" | "normal";
+  size: number;
+  color: string;
 }
+
+const BG = "rgba(0,0,0,0)";
 
 export default function AirportMap({ favorites, recents }: AirportMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -29,13 +32,18 @@ export default function AirportMap({ favorites, recents }: AirportMapProps) {
   const points: GlobePoint[] = useMemo(() => {
     return AIRPORTS
       .filter((a) => a.lat != null && a.lon != null)
-      .map((a) => ({
-        lat: a.lat!,
-        lng: a.lon!,
-        icao: a.icao,
-        name: a.name,
-        kind: favSet.has(a.icao) ? "fav" : recentSet.has(a.icao) ? "recent" : "normal",
-      }));
+      .map((a) => {
+        const isFav = favSet.has(a.icao);
+        const isRecent = recentSet.has(a.icao);
+        return {
+          lat: a.lat!,
+          lng: a.lon!,
+          icao: a.icao,
+          name: a.name,
+          size: isFav ? 0.55 : isRecent ? 0.4 : 0.18,
+          color: isFav ? "#FBBF24" : isRecent ? "#38BDF8" : "rgba(255,255,255,0.5)",
+        };
+      });
   }, [favSet, recentSet]);
 
   const handleClick = useCallback(
@@ -58,37 +66,28 @@ export default function AirportMap({ favorites, recents }: AirportMapProps) {
       const globe = new Globe(containerRef.current)
         .globeImageUrl("//unpkg.com/three-globe/example/img/earth-blue-marble.jpg")
         .bumpImageUrl("//unpkg.com/three-globe/example/img/earth-topology.png")
-        .backgroundColor("#000010")
+        .backgroundColor(BG)
         .showAtmosphere(true)
-        .atmosphereColor("#4da6ff")
-        .atmosphereAltitude(0.18)
+        .atmosphereColor("#3a7bd5")
+        .atmosphereAltitude(0.15)
         .pointOfView({ lat: 46, lng: 6, altitude: 2.2 }, 0)
-        // Points
-        .pointsData(points)
-        .pointLat("lat")
-        .pointLng("lng")
-        .pointAltitude((d: object) => {
+        // Flat dots using labelsData (HTML billboards, always face camera)
+        .labelsData(points)
+        .labelLat("lat")
+        .labelLng("lng")
+        .labelText(() => "")
+        .labelDotRadius((d: object) => (d as GlobePoint).size)
+        .labelColor((d: object) => (d as GlobePoint).color)
+        .labelResolution(2)
+        .labelAltitude(0.005)
+        .labelLabel((d: object) => {
           const p = d as GlobePoint;
-          return p.kind === "fav" ? 0.04 : p.kind === "recent" ? 0.025 : 0.008;
-        })
-        .pointRadius((d: object) => {
-          const p = d as GlobePoint;
-          return p.kind === "fav" ? 0.35 : p.kind === "recent" ? 0.25 : 0.12;
-        })
-        .pointColor((d: object) => {
-          const p = d as GlobePoint;
-          if (p.kind === "fav") return "#FBBF24";
-          if (p.kind === "recent") return "#38BDF8";
-          return "rgba(255, 255, 255, 0.6)";
-        })
-        .pointLabel((d: object) => {
-          const p = d as GlobePoint;
-          return `<div style="font-family:ui-monospace,monospace;background:rgba(0,0,0,0.75);backdrop-filter:blur(8px);padding:8px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.1)">
+          return `<div style="font-family:ui-monospace,monospace;background:rgba(0,0,0,0.8);backdrop-filter:blur(8px);padding:8px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.1)">
             <div style="font-size:14px;font-weight:800;letter-spacing:0.06em;color:#38BDF8">${p.icao}</div>
             <div style="font-size:11px;color:rgba(255,255,255,0.7);margin-top:2px">${p.name}</div>
           </div>`;
         })
-        .onPointClick(handleClick);
+        .onLabelClick(handleClick);
 
       // Responsive sizing
       function resize() {
@@ -116,6 +115,10 @@ export default function AirportMap({ favorites, recents }: AirportMapProps) {
       controls.enableDamping = true;
       controls.dampingFactor = 0.1;
 
+      // Make WebGL canvas transparent
+      const renderer = globe.renderer();
+      renderer.setClearColor(0x000000, 0);
+
       globeRef.current = globe;
 
       return () => {
@@ -136,7 +139,6 @@ export default function AirportMap({ favorites, recents }: AirportMapProps) {
     <div
       ref={containerRef}
       className="h-full w-full"
-      style={{ background: "#000010" }}
     />
   );
 }

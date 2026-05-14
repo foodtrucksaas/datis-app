@@ -10,7 +10,7 @@ import Link from "next/link";
 const AirportMap = dynamic(() => import("@/components/AirportMap"), {
   ssr: false,
   loading: () => (
-    <div className="flex-1 bg-[#000010]" />
+    <div className="flex-1 bg-[#0a0f1a]" />
   ),
 });
 
@@ -27,7 +27,7 @@ export default function Home() {
     <>
       <FirstLaunchDisclaimer />
 
-      <div className="flex min-h-dvh flex-col bg-[#000010] text-white">
+      <div className="flex min-h-dvh flex-col bg-[#0a0f1a] text-white">
 
         {/* Top bar: logo + clock */}
         <header className="flex items-center justify-between px-5 py-3">
