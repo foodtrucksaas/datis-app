@@ -131,13 +131,45 @@ function isOperational(subject: string, qcode: string, message: string): boolean
   return /\bRWY\b|\bTWY\b|\bILS\b|\bVOR\b|\bDME\b|\bNDB\b|\bPAPI\b|\bCLSD\b|\bU\/S\b|\bFUEL\b/.test(upper);
 }
 
-/** Extract a field value from a chunk of double-escaped RSC JSON */
+/** Extract a field value from a chunk of RSC JSON */
 function extractField(chunk: string, field: string): string {
-  // Handles both \\"field\\":\\"value\\" and "field":"value"
-  const re = new RegExp(`\\\\?"${field}\\\\?":\\s*\\\\?"((?:[^"\\\\]|\\\\.)*)\\\\?"`);
-  const m = chunk.match(re);
-  if (!m) return "";
-  return m[1].replace(/\\\\n/g, "\n").replace(/\\n/g, "\n").replace(/\\\\"/g, '"').replace(/\\"/g, '"');
+  // Look for the field key in double-escaped format: \\"field\\":\\"value\\"
+  // or normal format: "field":"value"
+  const key1 = `\\"${field}\\":\\"`;
+  const key2 = `"${field}":"`;
+  let idx = chunk.indexOf(key1);
+  let delim = '\\"';
+  if (idx === -1) {
+    idx = chunk.indexOf(key2);
+    delim = '"';
+  }
+  if (idx === -1) return "";
+
+  const valStart = idx + (delim === '\\"'
+    ? key1.length
+    : key2.length);
+
+  // Find end: next unescaped delimiter
+  let end = valStart;
+  while (end < chunk.length) {
+    const nextDelim = chunk.indexOf(delim, end);
+    if (nextDelim === -1) break;
+    // Check if preceded by escape
+    if (delim === '\\"' && chunk[nextDelim - 1] === '\\' && chunk[nextDelim - 2] === '\\') {
+      // \\\" = escaped quote inside value, skip
+      end = nextDelim + delim.length;
+      continue;
+    }
+    end = nextDelim;
+    break;
+  }
+
+  const raw = chunk.slice(valStart, end);
+  return raw
+    .replace(/\\\\n/g, "\n")
+    .replace(/\\n/g, "\n")
+    .replace(/\\\\"/g, '"')
+    .replace(/\\"/g, '"');
 }
 
 async function fetchFromNotamify(icao: string): Promise<Notam[]> {
@@ -278,14 +310,15 @@ async function fetchFromIcao(icao: string): Promise<Notam[]> {
 // ─── Main fetch: try Notamify first, fallback to ICAO for French airports ───
 
 export async function fetchNotams(icao: string): Promise<Notam[]> {
-  // Try Notamify first (worldwide coverage)
-  const notamify = await fetchFromNotamify(icao);
-  if (notamify.length > 0) return notamify;
-
-  // Fallback to ICAO API (only works for French airports LF*)
   if (icao.startsWith("LF")) {
-    return fetchFromIcao(icao);
+    // For French airports: fetch both sources in parallel, keep the richer one
+    const [notamify, icaoData] = await Promise.all([
+      fetchFromNotamify(icao),
+      fetchFromIcao(icao),
+    ]);
+    return notamify.length >= icaoData.length ? notamify : icaoData;
   }
 
-  return [];
+  // Rest of world: Notamify only
+  return fetchFromNotamify(icao);
 }
