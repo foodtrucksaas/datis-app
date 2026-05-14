@@ -15,10 +15,10 @@ function visibilityColor(vis: string): string | undefined {
   const match = vis.match(/^(\d+)/);
   if (match) {
     const meters = parseInt(match[1]);
-    if (meters < 1500) return "#C026D3"; // LIFR — magenta
-    if (meters < 5000) return "var(--stale)"; // IFR — red
-    if (meters < 8000) return "var(--accent)"; // MVFR — blue
-    return "var(--fresh)"; // VFR — green
+    if (meters < 1500) return "var(--stale)"; // LIFR
+    if (meters < 5000) return "var(--warm)"; // IFR
+    if (meters < 8000) return "var(--accent)"; // MVFR
+    return "var(--fresh)"; // VFR
   }
   return undefined;
 }
@@ -69,7 +69,7 @@ export function AtisCard({ atis }: AtisCardProps) {
           value={fields.wind}
           valueColor={windColor(fields.wind)}
         />
-        <MetricTile label="QNH" value={fields.qnh ? `${fields.qnh} hPa` : "N/A"} />
+        <MetricTile label="INFO Q" value={fields.qnh ? `${fields.qnh} hPa` : "N/A"} />
         <MetricTile
           label="Visibilité"
           value={fields.visibility}

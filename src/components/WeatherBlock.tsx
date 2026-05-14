@@ -4,8 +4,6 @@ import { RawDecodedToggle } from "./RawDecodedToggle";
 import { RawDataBlock } from "./RawDataBlock";
 import { DecodedMetar } from "./DecodedMetar";
 import { DecodedTaf } from "./DecodedTaf";
-import { FreshnessInline } from "./FreshnessBadge";
-
 interface WeatherBlockProps {
   label: string;
   raw: string;
@@ -18,7 +16,6 @@ interface WeatherBlockProps {
 export function WeatherBlock({
   label,
   raw,
-  receivedAt,
   type,
   mode,
   onToggle,
@@ -26,12 +23,9 @@ export function WeatherBlock({
   return (
     <div className="mx-5">
       <div className="mb-2 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
-            {label}
-          </h3>
-          <FreshnessInline receivedAt={receivedAt} />
-        </div>
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+          {label}
+        </h3>
         <RawDecodedToggle mode={mode} onToggle={onToggle} />
       </div>
 
