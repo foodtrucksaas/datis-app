@@ -23,19 +23,18 @@ interface RunwayData {
   surface: string;
 }
 
-function parseWind(wind: string): { dir: number; speed: number; gust?: number } | null {
-  if (!wind || wind === "N/A" || wind.startsWith("VRB")) return null;
-  const m = wind.match(/(\d{3})°\/(\d+)\s*kt(?:\s*G(\d+))?/i);
-  if (!m) return null;
-  return { dir: parseInt(m[1]), speed: parseInt(m[2]), gust: m[3] ? parseInt(m[3]) : undefined };
-}
-
-/** Parse wind from raw METAR string like "24009KT" or "24009G15KT" */
 function parseMetarWind(metar: string): { dir: number; speed: number; gust?: number } | null {
   if (!metar) return null;
   const m = metar.match(/\b(\d{3})(\d{2,3})(G(\d{2,3}))?KT\b/);
   if (!m) return null;
   return { dir: parseInt(m[1]), speed: parseInt(m[2]), gust: m[4] ? parseInt(m[4]) : undefined };
+}
+
+function parseAtisWind(wind: string): { dir: number; speed: number; gust?: number } | null {
+  if (!wind || wind === "N/A" || wind.startsWith("VRB")) return null;
+  const m = wind.match(/(\d{3})°\/(\d+)\s*kt(?:\s*G(\d+))?/i);
+  if (!m) return null;
+  return { dir: parseInt(m[1]), speed: parseInt(m[2]), gust: m[3] ? parseInt(m[3]) : undefined };
 }
 
 function windComponents(windDir: number, windSpeed: number, rwyHdg: number) {
@@ -50,26 +49,28 @@ function ftToM(ft: number): number {
   return Math.round(ft * 0.3048);
 }
 
-/** Convert lat/lon to local x/y in meters relative to center */
-function latLonToXY(
-  lat: number, lon: number,
-  centerLat: number, centerLon: number
-): { x: number; y: number } {
+function latLonToXY(lat: number, lon: number, cLat: number, cLon: number) {
   const R = 6371000;
-  const dLat = ((lat - centerLat) * Math.PI) / 180;
-  const dLon = ((lon - centerLon) * Math.PI) / 180;
-  const cosLat = Math.cos((centerLat * Math.PI) / 180);
-  return { x: R * dLon * cosLat, y: -R * dLat }; // y inverted for SVG
+  const dLat = ((lat - cLat) * Math.PI) / 180;
+  const dLon = ((lon - cLon) * Math.PI) / 180;
+  const cosLat = Math.cos((cLat * Math.PI) / 180);
+  return { x: R * dLon * cosLat, y: -R * dLat };
+}
+
+function getRoleTag(ident: string, arr: Set<string>, dep: Set<string>): string | null {
+  const a = arr.has(ident), d = dep.has(ident);
+  return a && d ? "ARR/DEP" : a ? "ARR" : d ? "DEP" : null;
 }
 
 export function RunwayDiagram({ icao, atisMessages, metarRaw }: RunwayDiagramProps) {
   const [runways, setRunways] = useState<RunwayData[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Prefer METAR wind, fallback to ATIS wind
   const metarWind = parseMetarWind(metarRaw ?? "");
-  const atisWindStr = atisMessages.find((a) => a.fields.wind && a.fields.wind !== "N/A")?.fields.wind ?? "";
-  const wind = metarWind ?? parseWind(atisWindStr);
+  const atisWind = parseAtisWind(
+    atisMessages.find((a) => a.fields.wind && a.fields.wind !== "N/A")?.fields.wind ?? ""
+  );
+  const wind = metarWind ?? atisWind;
   const windSource = metarWind ? "METAR" : "ATIS";
 
   const arrRunways = new Set<string>();
@@ -90,8 +91,9 @@ export function RunwayDiagram({ icao, atisMessages, metarRaw }: RunwayDiagramPro
 
   if (loading || !wind || runways.length === 0) return null;
 
-  // Check if we have coordinates for at least one runway
-  const hasCoords = runways.some((r) => r.le_lat != null && r.le_lon != null && r.he_lat != null && r.he_lon != null);
+  const validRunways = runways.filter(
+    (r) => r.le_lat != null && r.le_lon != null && r.he_lat != null && r.he_lon != null
+  );
 
   return (
     <div className="mx-5 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-5">
@@ -101,7 +103,7 @@ export function RunwayDiagram({ icao, atisMessages, metarRaw }: RunwayDiagramPro
 
       {/* Wind legend */}
       <div className="mb-4 flex items-center justify-center gap-2 text-xs text-[var(--text-secondary)]">
-        <WindArrowIcon dir={wind.dir} size={20} />
+        <WindArrowIcon dir={wind.dir} size={18} />
         <span className="font-mono">
           {wind.dir}° / {wind.speed} kt{wind.gust ? ` G${wind.gust}` : ""}
         </span>
@@ -109,9 +111,9 @@ export function RunwayDiagram({ icao, atisMessages, metarRaw }: RunwayDiagramPro
       </div>
 
       {/* Airport plan */}
-      {hasCoords && (
+      {validRunways.length > 0 && (
         <AirportPlan
-          runways={runways}
+          runways={validRunways}
           windDir={wind.dir}
           activeRunways={activeRunways}
           arrRunways={arrRunways}
@@ -124,33 +126,25 @@ export function RunwayDiagram({ icao, atisMessages, metarRaw }: RunwayDiagramPro
         {runways.map((rwy) => {
           const hdgA = rwy.le_heading_degT ?? parseInt(rwy.le_ident.replace(/[LRC]/g, "")) * 10;
           const hdgB = rwy.he_heading_degT ?? parseInt(rwy.he_ident.replace(/[LRC]/g, "")) * 10;
-
           return [
             { ident: rwy.le_ident, hdg: hdgA },
             { ident: rwy.he_ident, hdg: hdgB },
-          ].map(({ ident, hdg }) => {
-            const comp = windComponents(wind.dir, wind.speed, hdg);
-            const isActive = activeRunways.has(ident);
-            const isArr = arrRunways.has(ident);
-            const isDep = depRunways.has(ident);
-
-            return (
-              <ComponentCard
-                key={ident}
-                rwy={ident}
-                comp={comp}
-                active={isActive}
-                role={isArr && isDep ? "ARR/DEP" : isArr ? "ARR" : isDep ? "DEP" : null}
-              />
-            );
-          });
+          ].map(({ ident, hdg }) => (
+            <ComponentCard
+              key={ident}
+              rwy={ident}
+              comp={windComponents(wind.dir, wind.speed, hdg)}
+              active={activeRunways.has(ident)}
+              role={getRoleTag(ident, arrRunways, depRunways)}
+            />
+          ));
         })}
       </div>
     </div>
   );
 }
 
-/* ─── Airport Plan SVG ─── */
+/* ─── Airport Plan (HTML/CSS based, not SVG) ─── */
 
 function AirportPlan({
   runways, windDir, activeRunways, arrRunways, depRunways,
@@ -161,30 +155,24 @@ function AirportPlan({
   arrRunways: Set<string>;
   depRunways: Set<string>;
 }) {
-  const coords: { lat: number; lon: number }[] = [];
+  // Compute geographic center
+  const allCoords: { lat: number; lon: number }[] = [];
   for (const r of runways) {
-    if (r.le_lat != null && r.le_lon != null) coords.push({ lat: r.le_lat, lon: r.le_lon });
-    if (r.he_lat != null && r.he_lon != null) coords.push({ lat: r.he_lat, lon: r.he_lon });
+    allCoords.push({ lat: r.le_lat!, lon: r.le_lon! });
+    allCoords.push({ lat: r.he_lat!, lon: r.he_lon! });
   }
-  if (coords.length === 0) return null;
+  const cLat = allCoords.reduce((s, c) => s + c.lat, 0) / allCoords.length;
+  const cLon = allCoords.reduce((s, c) => s + c.lon, 0) / allCoords.length;
 
-  const centerLat = coords.reduce((s, c) => s + c.lat, 0) / coords.length;
-  const centerLon = coords.reduce((s, c) => s + c.lon, 0) / coords.length;
+  // Convert to local meters
+  const rwyData = runways.map((r) => {
+    const le = latLonToXY(r.le_lat!, r.le_lon!, cLat, cLon);
+    const he = latLonToXY(r.he_lat!, r.he_lon!, cLat, cLon);
+    return { ...r, le, he };
+  });
 
-  const svgRunways = runways
-    .filter((r) => r.le_lat != null && r.le_lon != null && r.he_lat != null && r.he_lon != null)
-    .map((r) => {
-      const le = latLonToXY(r.le_lat!, r.le_lon!, centerLat, centerLon);
-      const he = latLonToXY(r.he_lat!, r.he_lon!, centerLat, centerLon);
-      const isActiveA = activeRunways.has(r.le_ident);
-      const isActiveB = activeRunways.has(r.he_ident);
-      return { ...r, le, he, isActiveA, isActiveB, isActive: isActiveA || isActiveB };
-    });
-
-  if (svgRunways.length === 0) return null;
-
-  // Compute bounds in meters
-  const allPts = svgRunways.flatMap((r) => [r.le, r.he]);
+  // Compute bounds
+  const allPts = rwyData.flatMap((r) => [r.le, r.he]);
   const minX = Math.min(...allPts.map((p) => p.x));
   const maxX = Math.max(...allPts.map((p) => p.x));
   const minY = Math.min(...allPts.map((p) => p.y));
@@ -192,169 +180,166 @@ function AirportPlan({
 
   const rangeX = maxX - minX || 1;
   const rangeY = maxY - minY || 1;
-  const span = Math.max(rangeX, rangeY);
-  const padding = span * 0.3;
 
-  // Normalize to a 0–1000 coordinate system for predictable sizing
-  const totalSpan = span + padding * 2;
-  const svgSize = 1000;
-  const scale = svgSize / totalSpan;
-  const offsetX = minX - padding - (totalSpan - rangeX - padding * 2) / 2;
-  const offsetY = minY - padding - (totalSpan - rangeY - padding * 2) / 2;
+  // Add padding for labels (in meters, proportional to airport size)
+  const longestDim = Math.max(rangeX, rangeY);
+  const padX = longestDim * 0.2;
+  const padY = longestDim * 0.15;
 
-  const toSvg = (pt: { x: number; y: number }) => ({
-    x: (pt.x - offsetX) * scale,
-    y: (pt.y - offsetY) * scale,
-  });
+  const totalW = rangeX + padX * 2;
+  const totalH = rangeY + padY * 2;
 
-  // Unit size relative to SVG (for strokes, fonts, etc.)
-  const u = svgSize / 100; // 1u = 1% of svg
+  // SVG dimensions — use actual aspect ratio, cap height
+  const svgW = 600;
+  const svgH = svgW * (totalH / totalW);
+  const scale = svgW / totalW;
+
+  // Transform from meters to SVG coords
+  const toX = (x: number) => (x - minX + padX) * scale;
+  const toY = (y: number) => (y - minY + padY) * scale;
+
+  // Sizing units relative to the longest runway
+  const maxRwyLen = Math.max(...rwyData.map((r) => r.length_ft));
+  const maxRwyPx = maxRwyLen * 0.3048 * scale;
+  // Runway thickness: proportional but readable
+  const rwyThickness = Math.max(8, maxRwyPx * 0.025);
+  const fontSize = Math.max(11, maxRwyPx * 0.035);
+  const roleSize = fontSize * 0.65;
+  const dimSize = fontSize * 0.6;
+  const labelGap = fontSize * 1.8;
 
   return (
-    <div className="flex justify-center">
+    <div className="flex justify-center mb-2 overflow-hidden rounded-md bg-[var(--surface-elevated)] border border-[var(--border)]">
       <svg
-        viewBox={`0 0 ${svgSize} ${svgSize}`}
-        className="w-full max-w-lg"
-        style={{ aspectRatio: "1" }}
+        viewBox={`0 0 ${svgW} ${svgH}`}
+        className="w-full max-w-xl"
+        style={{ maxHeight: "320px" }}
       >
-        {/* Wind arrow top-right */}
-        <g transform={`translate(${svgSize - u * 8}, ${u * 8})`}>
+        {/* Wind arrow indicator */}
+        <g transform={`translate(${svgW - 35}, 35)`}>
+          <circle r="22" fill="none" stroke="var(--border)" strokeWidth="1" />
           <g transform={`rotate(${windDir + 180})`}>
-            <line x1="0" y1={-u * 4} x2="0" y2={u * 4} stroke="var(--accent)" strokeWidth={u * 0.5} strokeLinecap="round" />
-            <polygon points={`0,${-u * 4.5} ${-u * 1.2},${-u * 3} ${u * 1.2},${-u * 3}`} fill="var(--accent)" />
+            <line x1="0" y1="-15" x2="0" y2="12" stroke="var(--accent)" strokeWidth="2.5" strokeLinecap="round" />
+            <polygon points="0,-17 -4,-11 4,-11" fill="var(--accent)" />
           </g>
-          <text
-            x={0} y={u * 7}
-            textAnchor="middle"
-            fontSize={u * 1.2}
-            fontFamily="var(--font-mono), monospace"
-            fill="var(--text-muted)"
-          >
-            WIND
-          </text>
-        </g>
-
-        {/* North indicator top-left */}
-        <g transform={`translate(${u * 6}, ${u * 6})`}>
-          <line x1="0" y1={u * 2} x2="0" y2={-u * 3} stroke="var(--text-muted)" strokeWidth={u * 0.3} strokeLinecap="round" />
-          <polygon points={`0,${-u * 3.5} ${-u * 0.8},${-u * 2} ${u * 0.8},${-u * 2}`} fill="var(--text-muted)" />
-          <text
-            x={0} y={-u * 4.5}
-            textAnchor="middle"
-            fontSize={u * 1.5}
-            fontWeight="700"
-            fontFamily="var(--font-mono), monospace"
-            fill="var(--text-muted)"
-          >
-            N
-          </text>
+          <text x="0" y="0" textAnchor="middle" dominantBaseline="central"
+            fontSize="6" fontWeight="700" fontFamily="var(--font-mono), monospace"
+            fill="var(--text-muted)" opacity="0.5">W</text>
         </g>
 
         {/* Runways */}
-        {svgRunways.map((r) => {
-          const a = toSvg(r.le);
-          const b = toSvg(r.he);
-          const rwyWidth = Math.max(u * 1.5, r.width_ft * 0.3048 * scale);
-          const color = r.isActive ? "var(--text-primary)" : "var(--text-secondary)";
-          const opacity = r.isActive ? 1 : 0.5;
+        {rwyData.map((r) => {
+          const x1 = toX(r.le.x), y1 = toY(r.le.y);
+          const x2 = toX(r.he.x), y2 = toY(r.he.y);
+          const isActiveA = activeRunways.has(r.le_ident);
+          const isActiveB = activeRunways.has(r.he_ident);
+          const isActive = isActiveA || isActiveB;
 
-          const dx = b.x - a.x;
-          const dy = b.y - a.y;
+          // Direction vector
+          const dx = x2 - x1, dy = y2 - y1;
           const len = Math.sqrt(dx * dx + dy * dy) || 1;
-          const ux2 = dx / len;
-          const uy = dy / len;
-          const labelDist = u * 4;
+          const ux = dx / len, uy = dy / len;
+
+          // Label positions — beyond the runway ends
+          const leLabel = { x: x1 - ux * labelGap, y: y1 - uy * labelGap };
+          const heLabel = { x: x2 + ux * labelGap, y: y2 + uy * labelGap };
+
+          // Dimension label — offset perpendicular
+          const nx = -uy, ny = ux;
+          const dimOffset = rwyThickness / 2 + dimSize * 1.5;
+          const dimPos = {
+            x: (x1 + x2) / 2 + nx * dimOffset,
+            y: (y1 + y2) / 2 + ny * dimOffset,
+          };
+
+          const roleA = getRoleTag(r.le_ident, arrRunways, depRunways);
+          const roleB = getRoleTag(r.he_ident, arrRunways, depRunways);
 
           return (
             <g key={`${r.le_ident}-${r.he_ident}`}>
               {/* Runway surface */}
               <line
-                x1={a.x} y1={a.y} x2={b.x} y2={b.y}
-                stroke={color}
-                strokeWidth={rwyWidth}
+                x1={x1} y1={y1} x2={x2} y2={y2}
+                stroke={isActive ? "var(--text-primary)" : "var(--text-secondary)"}
+                strokeWidth={rwyThickness}
                 strokeLinecap="butt"
-                opacity={opacity}
+                opacity={isActive ? 0.9 : 0.35}
               />
 
-              {/* Center line */}
+              {/* Center dashes */}
               <line
-                x1={a.x} y1={a.y} x2={b.x} y2={b.y}
-                stroke="var(--bg)"
-                strokeWidth={u * 0.15}
-                strokeDasharray={`${u * 0.8} ${u * 0.5}`}
-                opacity={0.5}
+                x1={x1} y1={y1} x2={x2} y2={y2}
+                stroke="var(--surface-elevated)"
+                strokeWidth={1.5}
+                strokeDasharray="6 4"
+                opacity={0.6}
               />
 
-              {/* Threshold marks */}
+              {/* Threshold bars */}
               {[
-                { pt: a, active: r.isActiveA },
-                { pt: b, active: r.isActiveB },
-              ].map((t, i) => {
-                const nx = -uy;
-                const ny2 = ux2;
-                const hw = rwyWidth / 2;
-                return (
-                  <line
-                    key={i}
-                    x1={t.pt.x + nx * hw} y1={t.pt.y + ny2 * hw}
-                    x2={t.pt.x - nx * hw} y2={t.pt.y - ny2 * hw}
-                    stroke={t.active ? "var(--fresh)" : "var(--text-muted)"}
-                    strokeWidth={u * 0.4}
-                    opacity={t.active ? 1 : 0.4}
-                  />
-                );
-              })}
+                { px: x1, py: y1, active: isActiveA },
+                { px: x2, py: y2, active: isActiveB },
+              ].map((t, i) => (
+                <line key={i}
+                  x1={t.px + nx * rwyThickness * 0.6}
+                  y1={t.py + ny * rwyThickness * 0.6}
+                  x2={t.px - nx * rwyThickness * 0.6}
+                  y2={t.py - ny * rwyThickness * 0.6}
+                  stroke={t.active ? "var(--fresh)" : "var(--text-muted)"}
+                  strokeWidth={3}
+                  strokeLinecap="round"
+                  opacity={t.active ? 1 : 0.4}
+                />
+              ))}
 
-              {/* Designator labels */}
-              {[
-                { pt: a, dir: -1, ident: r.le_ident, active: r.isActiveA },
-                { pt: b, dir: 1, ident: r.he_ident, active: r.isActiveB },
-              ].map((label) => {
-                const lx = label.pt.x - ux2 * labelDist * label.dir;
-                const ly = label.pt.y - uy * labelDist * label.dir;
-                const role = getRoleTag(label.ident, arrRunways, depRunways);
-                return (
-                  <g key={label.ident}>
-                    <text
-                      x={lx} y={ly}
-                      textAnchor="middle"
-                      dominantBaseline="central"
-                      fontSize={u * 1.8}
-                      fontWeight="700"
-                      fontFamily="var(--font-mono), monospace"
-                      fill={label.active ? "var(--fresh)" : "var(--text-muted)"}
-                    >
-                      {label.ident}
-                    </text>
-                    {role && (
-                      <text
-                        x={lx} y={ly + u * 2}
-                        textAnchor="middle"
-                        dominantBaseline="central"
-                        fontSize={u * 1.1}
-                        fontWeight="700"
-                        fontFamily="var(--font-mono), monospace"
-                        fill="var(--accent)"
-                      >
-                        {role}
-                      </text>
-                    )}
-                  </g>
-                );
-              })}
+              {/* LE label */}
+              <text x={leLabel.x} y={leLabel.y}
+                textAnchor="middle" dominantBaseline="central"
+                fontSize={fontSize} fontWeight="700"
+                fontFamily="var(--font-mono), monospace"
+                fill={isActiveA ? "var(--fresh)" : "var(--text-muted)"}
+              >
+                {r.le_ident}
+              </text>
+              {roleA && (
+                <text x={leLabel.x} y={leLabel.y + fontSize * 0.9}
+                  textAnchor="middle" dominantBaseline="central"
+                  fontSize={roleSize} fontWeight="700"
+                  fontFamily="var(--font-mono), monospace"
+                  fill="var(--accent)"
+                >
+                  {roleA}
+                </text>
+              )}
+
+              {/* HE label */}
+              <text x={heLabel.x} y={heLabel.y}
+                textAnchor="middle" dominantBaseline="central"
+                fontSize={fontSize} fontWeight="700"
+                fontFamily="var(--font-mono), monospace"
+                fill={isActiveB ? "var(--fresh)" : "var(--text-muted)"}
+              >
+                {r.he_ident}
+              </text>
+              {roleB && (
+                <text x={heLabel.x} y={heLabel.y + fontSize * 0.9}
+                  textAnchor="middle" dominantBaseline="central"
+                  fontSize={roleSize} fontWeight="700"
+                  fontFamily="var(--font-mono), monospace"
+                  fill="var(--accent)"
+                >
+                  {roleB}
+                </text>
+              )}
 
               {/* Dimensions */}
-              <text
-                x={(a.x + b.x) / 2 + (-uy) * (rwyWidth / 2 + u * 2.5)}
-                y={(a.y + b.y) / 2 + ux2 * (rwyWidth / 2 + u * 2.5)}
-                textAnchor="middle"
-                dominantBaseline="central"
-                fontSize={u * 1.2}
+              <text x={dimPos.x} y={dimPos.y}
+                textAnchor="middle" dominantBaseline="central"
+                fontSize={dimSize}
                 fontFamily="var(--font-mono), monospace"
-                fill="var(--text-muted)"
-                opacity="0.7"
+                fill="var(--text-muted)" opacity="0.6"
               >
-                {ftToM(r.length_ft)} x {ftToM(r.width_ft)} m
+                {ftToM(r.length_ft)} x {ftToM(r.width_ft)}m
               </text>
             </g>
           );
@@ -362,15 +347,6 @@ function AirportPlan({
       </svg>
     </div>
   );
-}
-
-function getRoleTag(ident: string, arrRunways: Set<string>, depRunways: Set<string>): string | null {
-  const isArr = arrRunways.has(ident);
-  const isDep = depRunways.has(ident);
-  if (isArr && isDep) return "ARR/DEP";
-  if (isArr) return "ARR";
-  if (isDep) return "DEP";
-  return null;
 }
 
 /* ─── Wind Component Cards ─── */
@@ -420,21 +396,12 @@ function ComponentCard({ rwy, comp, active, role }: {
   );
 }
 
-function WindArrowIcon({ dir, size = 20 }: { dir: number; size?: number }) {
+function WindArrowIcon({ dir, size = 18 }: { dir: number; size?: number }) {
   return (
-    <svg
-      width={size} height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      style={{ transform: `rotate(${dir + 180}deg)` }}
-    >
-      <path
-        d="M12 2L12 22M12 2L7 8M12 2L17 8"
-        stroke="currentColor"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      style={{ transform: `rotate(${dir + 180}deg)` }}>
+      <path d="M12 2L12 22M12 2L7 8M12 2L17 8"
+        stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
