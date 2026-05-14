@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Plane } from "lucide-react";
+import { IcaoInput } from "@/components/IcaoInput";
 import { UtcClock } from "@/components/UtcClock";
 import { Wordmark } from "@/components/Wordmark";
 import {
@@ -195,22 +196,27 @@ export default function AtisPage() {
       )}
 
       {/* Sticky header */}
-      <header className="sticky top-0 z-40 flex items-center gap-3 border-b border-[var(--border)] bg-[var(--bg)]/95 px-5 py-3 backdrop-blur-sm">
-        <Link href="/" className="p-1 -ml-1 text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors">
-          <ArrowLeft className="h-5 w-5" />
-        </Link>
-        <Wordmark size="sm" />
-        <span className="font-mono text-xs font-medium text-[var(--text-muted)]">
-          · {icao}
-        </span>
-        <div className="ml-auto flex items-center gap-2">
-          {isLive && (
-            <span className="rounded-full bg-[var(--fresh)]/15 px-2 py-0.5 text-[10px] font-medium text-[var(--fresh)]">
-              LIVE
-            </span>
-          )}
-          <UtcClock />
-          <ThemeToggle />
+      <header className="sticky top-0 z-40 border-b border-[var(--border)] bg-[var(--bg)]/95 backdrop-blur-sm">
+        <div className="flex items-center gap-3 px-5 py-3">
+          <Link href="/" className="p-1 -ml-1 text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors">
+            <ArrowLeft className="h-5 w-5" />
+          </Link>
+          <Wordmark size="sm" />
+          <span className="font-mono text-xs font-medium text-[var(--text-muted)]">
+            · {icao}
+          </span>
+          <div className="ml-auto flex items-center gap-2">
+            {isLive && (
+              <span className="rounded-full bg-[var(--fresh)]/15 px-2 py-0.5 text-[10px] font-medium text-[var(--fresh)]">
+                LIVE
+              </span>
+            )}
+            <UtcClock />
+            <ThemeToggle />
+          </div>
+        </div>
+        <div className="px-5 pb-3">
+          <IcaoInput />
         </div>
       </header>
 
