@@ -27,6 +27,7 @@ import { Meteogram } from "@/components/Meteogram";
 import { NotamBlock } from "@/components/NotamBlock";
 import { SunTimes } from "@/components/SunTimes";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { RunwayDiagram } from "@/components/RunwayDiagram";
 
 export default function AtisPage() {
   const params = useParams<{ icao: string }>();
@@ -246,6 +247,9 @@ export default function AtisPage() {
             </p>
           </div>
         )}
+
+        {/* Runway wind components */}
+        {hasAtis && <RunwayDiagram fields={data.atis[0].fields} />}
 
         {/* METAR */}
         {data.metar && (
