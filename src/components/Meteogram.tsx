@@ -172,9 +172,21 @@ export function Meteogram({ lat, lon }: MeteogramProps) {
     }
   }
 
+  // Find the "now" column index
+  const nowUtc = new Date();
+  const nowHourStr = String(nowUtc.getUTCHours()).padStart(2, "0");
+  const nowDay = nowUtc.toISOString().slice(0, 10);
+  const nowIdx = hours.findIndex(
+    (h) => h.time.slice(0, 10) === nowDay && h.hour === nowHourStr
+  );
+
   const cell = "px-2.5 py-1.5 text-center font-mono text-[11px] leading-tight";
   const label =
     "sticky left-0 z-10 bg-[var(--surface)] px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-muted)] whitespace-nowrap border-r border-[var(--border)]";
+
+  function nowBorder(i: number): string {
+    return i === nowIdx ? "border-l-2 border-l-[var(--accent)]" : "";
+  }
 
   return (
     <div className="mx-5">
@@ -182,16 +194,16 @@ export function Meteogram({ lat, lon }: MeteogramProps) {
         <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
           Météogramme · ECMWF
         </h3>
-        <div className="flex rounded-md border border-[var(--border)] overflow-hidden text-[10px] font-medium">
+        <div className="flex rounded-md border border-[var(--border)] overflow-hidden text-[11px] font-semibold">
           <button
             onClick={() => setStep(1)}
-            className={`px-2 py-0.5 transition-colors ${step === 1 ? "bg-[var(--accent)] text-white" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"}`}
+            className={`px-3 py-1 transition-colors ${step === 1 ? "bg-[var(--accent)] text-white" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--surface-elevated)]"}`}
           >
             1h
           </button>
           <button
             onClick={() => setStep(3)}
-            className={`px-2 py-0.5 transition-colors ${step === 3 ? "bg-[var(--accent)] text-white" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"}`}
+            className={`px-3 py-1 transition-colors ${step === 3 ? "bg-[var(--accent)] text-white" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--surface-elevated)]"}`}
           >
             3h
           </button>
@@ -221,17 +233,17 @@ export function Meteogram({ lat, lon }: MeteogramProps) {
             <tr className="border-b border-[var(--border)]">
               <td className={label}>UTC</td>
               {hours.map((h, i) => (
-                <td key={i} className={`${cell} font-semibold text-[var(--text-secondary)]`}>
+                <td key={i} className={`${cell} font-semibold text-[var(--text-secondary)] ${nowBorder(i)}`}>
                   {h.hour}Z
                 </td>
               ))}
             </tr>
 
             {/* Weather */}
-            <tr className="border-b border-[var(--border)]">
+            <tr className="border-b border-[var(--border)] bg-[var(--surface-elevated)]/30">
               <td className={label} />
               {hours.map((h, i) => (
-                <td key={i} className={`${cell} text-sm`}>
+                <td key={i} className={`${cell} text-base ${nowBorder(i)}`}>
                   {weatherIcon(h.weatherCode, h.cloud)}
                 </td>
               ))}
@@ -243,7 +255,7 @@ export function Meteogram({ lat, lon }: MeteogramProps) {
               {hours.map((h, i) => (
                 <td
                   key={i}
-                  className={`${cell} font-bold text-[var(--text-primary)]`}
+                  className={`${cell} font-bold text-[var(--text-primary)] ${nowBorder(i)}`}
                   style={{ backgroundColor: tempBg(h.temp) }}
                 >
                   {h.temp}°
@@ -252,10 +264,10 @@ export function Meteogram({ lat, lon }: MeteogramProps) {
             </tr>
 
             {/* Dewpoint */}
-            <tr className="border-b border-[var(--border)]">
+            <tr className="border-b border-[var(--border)] bg-[var(--surface-elevated)]/30">
               <td className={label}>Rosée</td>
               {hours.map((h, i) => (
-                <td key={i} className={`${cell} text-[var(--text-muted)]`}>
+                <td key={i} className={`${cell} text-[var(--text-muted)] ${nowBorder(i)}`}>
                   {h.dewpoint}°
                 </td>
               ))}
@@ -267,7 +279,7 @@ export function Meteogram({ lat, lon }: MeteogramProps) {
               {hours.map((h, i) => (
                 <td
                   key={i}
-                  className={`${cell} font-bold`}
+                  className={`${cell} font-bold ${nowBorder(i)}`}
                   style={{ backgroundColor: windBg(h.wind) }}
                 >
                   <span className="opacity-60 mr-0.5"><WindArrow deg={h.windDir} /></span>
@@ -277,12 +289,12 @@ export function Meteogram({ lat, lon }: MeteogramProps) {
             </tr>
 
             {/* Gusts */}
-            <tr className="border-b border-[var(--border)]">
+            <tr className="border-b border-[var(--border)] bg-[var(--surface-elevated)]/30">
               <td className={label}>Raf.</td>
               {hours.map((h, i) => (
                 <td
                   key={i}
-                  className={`${cell} text-[var(--text-muted)]`}
+                  className={`${cell} text-[var(--text-muted)] ${nowBorder(i)}`}
                   style={{ backgroundColor: gustBg(h.gusts) }}
                 >
                   {h.gusts}
@@ -294,19 +306,19 @@ export function Meteogram({ lat, lon }: MeteogramProps) {
             <tr className="border-b border-[var(--border)]">
               <td className={label}>hPa</td>
               {hours.map((h, i) => (
-                <td key={i} className={`${cell} text-[var(--text-secondary)]`}>
+                <td key={i} className={`${cell} text-[var(--text-secondary)] ${nowBorder(i)}`}>
                   {h.qnh}
                 </td>
               ))}
             </tr>
 
             {/* Precip */}
-            <tr>
+            <tr className="bg-[var(--surface-elevated)]/30">
               <td className={label}>Pluie</td>
               {hours.map((h, i) => (
                 <td
                   key={i}
-                  className={cell}
+                  className={`${cell} ${nowBorder(i)}`}
                   style={{ backgroundColor: precipBg(h.precip) }}
                 >
                   <span className={h.precip > 0 ? "font-semibold text-[var(--accent)]" : "text-[var(--text-muted)]"}>

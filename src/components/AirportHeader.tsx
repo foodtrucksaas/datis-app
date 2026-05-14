@@ -11,6 +11,7 @@ interface AirportHeaderProps {
 
 export function AirportHeader({ airport }: AirportHeaderProps) {
   const [fav, setFav] = useState(false);
+  const [justToggled, setJustToggled] = useState(false);
 
   useEffect(() => {
     setFav(isFavorite(airport.icao));
@@ -24,6 +25,8 @@ export function AirportHeader({ airport }: AirportHeaderProps) {
       addFavorite(airport.icao);
       setFav(true);
     }
+    setJustToggled(true);
+    setTimeout(() => setJustToggled(false), 300);
   };
 
   return (
@@ -35,18 +38,23 @@ export function AirportHeader({ airport }: AirportHeaderProps) {
         <p className="mt-0.5 text-sm text-[var(--text-secondary)]">
           {airport.name}
         </p>
+        {airport.lat != null && airport.lon != null && (
+          <p className="mt-0.5 text-[10px] font-mono text-[var(--text-muted)]">
+            {airport.lat.toFixed(2)}° / {airport.lon.toFixed(2)}°
+          </p>
+        )}
       </div>
       <button
         onClick={toggleFav}
         aria-label={fav ? "Retirer des favoris" : "Ajouter aux favoris"}
-        className="mt-1 p-1.5 transition-colors"
+        className="mt-1 rounded-md p-2.5 transition-all active:scale-90"
       >
         <Star
-          className={`h-5 w-5 ${
+          className={`h-5 w-5 transition-all duration-200 ${
             fav
               ? "fill-[var(--warm)] text-[var(--warm)]"
               : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
-          }`}
+          } ${justToggled ? "scale-125" : ""}`}
         />
       </button>
     </div>

@@ -15,8 +15,10 @@ function visibilityColor(vis: string): string | undefined {
   const match = vis.match(/^(\d+)/);
   if (match) {
     const meters = parseInt(match[1]);
-    if (meters < 1500) return "var(--stale)";
-    if (meters < 5000) return "var(--warm)";
+    if (meters < 1500) return "#C026D3"; // LIFR — magenta
+    if (meters < 5000) return "var(--stale)"; // IFR — red
+    if (meters < 8000) return "var(--accent)"; // MVFR — blue
+    return "var(--fresh)"; // VFR — green
   }
   return undefined;
 }
@@ -41,14 +43,19 @@ export function AtisCard({ atis }: AtisCardProps) {
 
   return (
     <div className="mx-5 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-5">
-      {/* Letter */}
-      <div className="text-center">
-        <p className="font-mono text-5xl font-bold tracking-wider text-[var(--accent)]">
-          {fields.type ? `${fields.type} ` : ""}INFO {fields.letter}
-        </p>
-        <div className="mt-2 flex items-center justify-center">
-          <FreshnessBadge receivedAt={atis.receivedAt} />
+      {/* Hero letter */}
+      <div className="flex flex-col items-center gap-2">
+        <div className="flex h-20 w-20 items-center justify-center rounded-full border-2 border-[var(--accent)]/40 bg-[var(--accent)]/8">
+          <span className="font-mono text-4xl font-bold text-[var(--accent)]">
+            {fields.letter}
+          </span>
         </div>
+        {fields.type && (
+          <span className="rounded-full bg-[var(--accent)]/10 px-3 py-0.5 text-[10px] font-bold uppercase tracking-widest text-[var(--accent)]">
+            {fields.type === "ARR" ? "Arrival" : "Departure"}
+          </span>
+        )}
+        <FreshnessBadge receivedAt={atis.receivedAt} />
       </div>
 
       {/* 2x2 grid */}
@@ -70,18 +77,23 @@ export function AtisCard({ atis }: AtisCardProps) {
         />
       </div>
 
-      {/* Secondary info */}
-      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 px-1 text-xs text-[var(--text-muted)]">
+      {/* Secondary info pills */}
+      <div className="mt-3 flex flex-wrap gap-1.5 px-1">
         {secondaryRunways.length > 0 && (
-          <span>
-            {isDep ? "ARR" : "DEP"} {secondaryRunways.join(" · ")}
+          <span className="inline-flex items-center gap-1 rounded bg-[var(--surface-elevated)] px-2 py-0.5 text-[10px] font-medium text-[var(--text-secondary)]">
+            <span className="font-bold text-[var(--text-muted)]">{isDep ? "ARR" : "DEP"}</span>
+            {secondaryRunways.join(" · ")}
           </span>
         )}
         {fields.transitionLevel !== "N/A" && (
-          <span>TRL {fields.transitionLevel}</span>
+          <span className="inline-flex items-center gap-1 rounded bg-[var(--surface-elevated)] px-2 py-0.5 text-[10px] font-medium text-[var(--text-secondary)]">
+            <span className="font-bold text-[var(--text-muted)]">TRL</span>
+            {fields.transitionLevel}
+          </span>
         )}
         {fields.temperature !== null && fields.dewpoint !== null && (
-          <span>
+          <span className="inline-flex items-center gap-1 rounded bg-[var(--surface-elevated)] px-2 py-0.5 text-[10px] font-medium text-[var(--text-secondary)]">
+            <span className="font-bold text-[var(--text-muted)]">TEMP</span>
             {fields.temperature}°C / {fields.dewpoint}°C
           </span>
         )}

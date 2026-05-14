@@ -38,7 +38,11 @@ export function WeatherBlock({
       {mode === "raw" ? (
         <RawDataBlock raw={raw} />
       ) : (
-        <div className="rounded-md border border-[var(--border)] bg-[var(--mono-bg)]">
+        <div className={`rounded-md border bg-[var(--mono-bg)] ${
+          type === "taf"
+            ? "border-[var(--accent)]/20"
+            : "border-[var(--border)]"
+        }`}>
           {type === "metar" ? (
             <DecodedMetar raw={raw} />
           ) : (

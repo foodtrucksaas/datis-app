@@ -10,25 +10,25 @@ interface NotamBlockProps {
 
 const SEVERITY_STYLE = {
   high: {
-    dot: "bg-red-500",
+    bar: "bg-red-500",
     label: "text-red-600 dark:text-red-400",
-    bg: "bg-red-500/8",
+    badge: "bg-red-500/12 text-red-600 dark:text-red-400 border-red-500/20",
   },
   medium: {
-    dot: "bg-amber-500",
+    bar: "bg-amber-500",
     label: "text-amber-600 dark:text-amber-400",
-    bg: "bg-amber-500/8",
+    badge: "bg-amber-500/12 text-amber-600 dark:text-amber-400 border-amber-500/20",
   },
   low: {
-    dot: "bg-blue-400",
+    bar: "bg-blue-400",
     label: "text-[var(--text-secondary)]",
-    bg: "",
+    badge: "bg-[var(--surface-elevated)] text-[var(--text-muted)] border-[var(--border)]",
   },
 };
 
 function formatEndDate(iso: string): string {
   const d = new Date(iso);
-  if (d.getFullYear() > 2090) return "PERM";
+  if (d.getFullYear() > 2090) return "Permanent";
   const day = String(d.getUTCDate()).padStart(2, "0");
   const month = String(d.getUTCMonth() + 1).padStart(2, "0");
   return `${day}/${month}`;
@@ -74,9 +74,14 @@ export function NotamBlock({ icao }: NotamBlockProps) {
 
   return (
     <div className="mx-5">
-      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
-        NOTAMs
-      </h3>
+      <div className="mb-2 flex items-center gap-2">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+          NOTAMs
+        </h3>
+        <span className="rounded-full bg-[var(--surface-elevated)] px-1.5 py-0.5 text-[9px] font-bold tabular-nums text-[var(--text-muted)]">
+          {notams.length}
+        </span>
+      </div>
       <div className="space-y-1.5">
         {notams.map((n) => {
           const style = SEVERITY_STYLE[n.severity];
@@ -84,47 +89,50 @@ export function NotamBlock({ icao }: NotamBlockProps) {
           return (
             <div
               key={n.id}
-              className={`rounded-lg border border-[var(--border)] bg-[var(--surface)] overflow-hidden ${style.bg}`}
+              className="flex overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)]"
             >
-              <button
-                onClick={() => setExpanded(isExpanded ? null : n.id)}
-                className="flex w-full items-start gap-2.5 px-3 py-2.5 text-left"
-              >
-                <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${style.dot}`} />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="rounded bg-[var(--surface-elevated,var(--surface))] border border-[var(--border)] px-1.5 py-0.5 text-[9px] font-bold tracking-wide text-[var(--text-muted)]">
-                      {subjectLabel(n.subject)}
-                    </span>
-                    <span className={`text-xs font-medium ${style.label} truncate`}>
-                      {n.message.split("\n")[0].slice(0, 80)}
-                    </span>
+              {/* Severity sidebar bar */}
+              <div className={`w-1 shrink-0 ${style.bar}`} />
+              <div className="flex-1 min-w-0">
+                <button
+                  onClick={() => setExpanded(isExpanded ? null : n.id)}
+                  className="flex w-full items-start gap-2.5 px-3 py-2.5 text-left"
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className={`rounded border px-1.5 py-0.5 text-[9px] font-bold tracking-wide ${style.badge}`}>
+                        {subjectLabel(n.subject)}
+                      </span>
+                      <span className={`text-xs font-medium ${style.label} truncate`}>
+                        {n.message.split("\n")[0].slice(0, 80)}
+                      </span>
+                    </div>
+                    <div className="mt-0.5 text-[10px] text-[var(--text-muted)]">
+                      {n.id} · jusqu&apos;au {formatEndDate(n.endDate)}
+                    </div>
                   </div>
-                  <div className="mt-0.5 text-[10px] text-[var(--text-muted)]">
-                    {n.id} · jusqu&apos;au {formatEndDate(n.endDate)}
-                  </div>
-                </div>
-                {isExpanded ? (
-                  <ChevronUp className="mt-1 h-3.5 w-3.5 shrink-0 text-[var(--text-muted)]" />
-                ) : (
-                  <ChevronDown className="mt-1 h-3.5 w-3.5 shrink-0 text-[var(--text-muted)]" />
-                )}
-              </button>
-              {isExpanded && (
-                <div className="border-t border-[var(--border)] px-3 py-2.5">
-                  <pre className="whitespace-pre-wrap text-[11px] font-mono leading-relaxed text-[var(--text-secondary)]">
-                    {n.message}
-                  </pre>
-                  <details className="mt-2">
-                    <summary className="cursor-pointer text-[10px] text-[var(--text-muted)] hover:text-[var(--text-secondary)]">
-                      NOTAM brut
-                    </summary>
-                    <pre className="mt-1 whitespace-pre-wrap text-[10px] font-mono leading-relaxed text-[var(--text-muted)]">
-                      {n.raw}
+                  {isExpanded ? (
+                    <ChevronUp className="mt-1 h-3.5 w-3.5 shrink-0 text-[var(--text-muted)]" />
+                  ) : (
+                    <ChevronDown className="mt-1 h-3.5 w-3.5 shrink-0 text-[var(--text-muted)]" />
+                  )}
+                </button>
+                {isExpanded && (
+                  <div className="border-t border-[var(--border)] px-3 py-2.5">
+                    <pre className="whitespace-pre-wrap text-[11px] font-mono leading-relaxed text-[var(--text-secondary)]">
+                      {n.message}
                     </pre>
-                  </details>
-                </div>
-              )}
+                    <details className="mt-2">
+                      <summary className="cursor-pointer text-[10px] text-[var(--text-muted)] hover:text-[var(--text-secondary)]">
+                        NOTAM brut
+                      </summary>
+                      <pre className="mt-1 whitespace-pre-wrap text-[10px] font-mono leading-relaxed text-[var(--text-muted)]">
+                        {n.raw}
+                      </pre>
+                    </details>
+                  </div>
+                )}
+              </div>
             </div>
           );
         })}

@@ -31,33 +31,49 @@ export function DecodedTaf({ raw }: DecodedTafProps) {
           Validité : {validity}
         </div>
       )}
-      {periods.map((period, pi) => (
-        <div key={pi} className="space-y-1.5">
-          <div className="flex items-center gap-2">
-            <span className="font-mono text-[11px] font-semibold text-[var(--accent)]">
-              {periodLabels[period.type] || period.type}
-            </span>
-            {(period.from || period.to) && (
-              <span className="text-[11px] text-[var(--text-muted)]">
-                {period.from}{period.to ? ` → ${period.to}` : ""}
+      {periods.map((period, pi) => {
+        const borderColor =
+          period.type === "TEMPO" || period.type === "PROB30" || period.type === "PROB40"
+            ? "border-l-amber-500"
+            : period.type === "BECMG"
+            ? "border-l-blue-400"
+            : period.type === "FM"
+            ? "border-l-[var(--accent)]"
+            : "border-l-transparent";
+        const bgColor =
+          period.type === "TEMPO" || period.type === "PROB30" || period.type === "PROB40"
+            ? "bg-amber-500/5"
+            : period.type === "BECMG"
+            ? "bg-blue-400/5"
+            : "";
+        return (
+          <div key={pi} className={`space-y-1.5 border-l-2 ${borderColor} ${bgColor} pl-3 py-1 rounded-r`}>
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-[11px] font-bold text-[var(--accent)]">
+                {periodLabels[period.type] || period.type}
               </span>
-            )}
-          </div>
-          {period.tokens.map((t, ti) => (
-            <div key={ti} className="flex items-baseline gap-2 text-xs pl-2">
-              <span className="shrink-0 w-24 text-right text-[var(--text-muted)]">
-                {t.label}
-              </span>
-              <span
-                className="font-mono"
-                style={{ color: tokenColor(t.color) }}
-              >
-                {t.value}
-              </span>
+              {(period.from || period.to) && (
+                <span className="text-[11px] text-[var(--text-muted)]">
+                  {period.from}{period.to ? ` → ${period.to}` : ""}
+                </span>
+              )}
             </div>
-          ))}
-        </div>
-      ))}
+            {period.tokens.map((t, ti) => (
+              <div key={ti} className="flex items-baseline gap-2 text-xs">
+                <span className="shrink-0 w-24 text-right text-[var(--text-muted)]">
+                  {t.label}
+                </span>
+                <span
+                  className="font-mono"
+                  style={{ color: tokenColor(t.color) }}
+                >
+                  {t.value}
+                </span>
+              </div>
+            ))}
+          </div>
+        );
+      })}
     </div>
   );
 }

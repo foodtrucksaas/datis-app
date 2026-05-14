@@ -20,7 +20,7 @@ export function ThemeToggle() {
   return (
     <button
       onClick={toggle}
-      className="shrink-0 rounded-md border border-[var(--border)] bg-[var(--surface)] p-2 text-[var(--text-muted)] transition-colors hover:border-[var(--accent-dim)] hover:text-[var(--accent)]"
+      className="shrink-0 rounded-md border border-[var(--border)] bg-[var(--surface)] p-2.5 text-[var(--text-muted)] transition-colors hover:border-[var(--accent-dim)] hover:text-[var(--accent)] active:scale-95"
       aria-label={dark ? "Mode clair" : "Mode sombre"}
     >
       {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}

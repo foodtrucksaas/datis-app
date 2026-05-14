@@ -3,7 +3,8 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Plane, Loader2 } from "lucide-react";
+import { ArrowLeft, Plane } from "lucide-react";
+import { UtcClock } from "@/components/UtcClock";
 import {
   getSettings,
   updateSettings,
@@ -22,6 +23,7 @@ import { WeatherBlock } from "@/components/WeatherBlock";
 import { PageFooter } from "@/components/PageFooter";
 import { Meteogram } from "@/components/Meteogram";
 import { NotamBlock } from "@/components/NotamBlock";
+import { SunTimes } from "@/components/SunTimes";
 
 export default function AtisPage() {
   const params = useParams<{ icao: string }>();
@@ -107,23 +109,44 @@ export default function AtisPage() {
     loadData();
   };
 
-  // Loading state
+  // Loading skeleton
   if (loading) {
     return (
       <>
-        <header className="flex items-center gap-3 px-5 py-4">
-          <Link href="/" className="text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors">
+        <header className="sticky top-0 z-40 flex items-center gap-3 border-b border-[var(--border)] bg-[var(--bg)]/95 px-5 py-3 backdrop-blur-sm">
+          <Link href="/" className="p-1 -ml-1 text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors">
             <ArrowLeft className="h-5 w-5" />
           </Link>
           <span className="font-mono text-base font-semibold tracking-wide text-[var(--accent)]">
             ATIS·EU
           </span>
+          <span className="font-mono text-xs font-medium text-[var(--text-muted)]">
+            · {icao}
+          </span>
         </header>
-        <main className="flex flex-1 flex-col items-center justify-center gap-3">
-          <Loader2 className="h-6 w-6 animate-spin text-[var(--accent)]" />
-          <p className="font-mono text-sm text-[var(--text-secondary)]">
-            Recherche D-ATIS {icao}...
-          </p>
+        <main className="flex flex-1 flex-col gap-5 px-5 py-6">
+          {/* Airport header skeleton */}
+          <div className="space-y-2">
+            <div className="h-7 w-24 animate-pulse rounded bg-[var(--surface-elevated)]" />
+            <div className="h-4 w-48 animate-pulse rounded bg-[var(--surface-elevated)]" />
+          </div>
+          {/* ATIS card skeleton */}
+          <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-5">
+            <div className="flex flex-col items-center gap-3">
+              <div className="h-20 w-20 animate-pulse rounded-full bg-[var(--surface-elevated)]" />
+              <div className="h-4 w-20 animate-pulse rounded bg-[var(--surface-elevated)]" />
+            </div>
+            <div className="mt-5 grid grid-cols-2 gap-2.5">
+              {[0, 1, 2, 3].map((i) => (
+                <div key={i} className="h-14 animate-pulse rounded-md bg-[var(--surface-elevated)]" />
+              ))}
+            </div>
+          </div>
+          {/* Weather skeleton */}
+          <div className="space-y-2">
+            <div className="h-3 w-16 animate-pulse rounded bg-[var(--surface-elevated)]" />
+            <div className="h-16 animate-pulse rounded-md bg-[var(--surface-elevated)]" />
+          </div>
         </main>
       </>
     );
@@ -173,19 +196,25 @@ export default function AtisPage() {
         />
       )}
 
-      {/* Header */}
-      <header className="flex items-center gap-3 px-5 py-4">
-        <Link href="/" className="text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors">
+      {/* Sticky header */}
+      <header className="sticky top-0 z-40 flex items-center gap-3 border-b border-[var(--border)] bg-[var(--bg)]/95 px-5 py-3 backdrop-blur-sm">
+        <Link href="/" className="p-1 -ml-1 text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors">
           <ArrowLeft className="h-5 w-5" />
         </Link>
         <span className="font-mono text-base font-semibold tracking-wide text-[var(--accent)]">
           ATIS·EU
         </span>
-        {isLive && (
-          <span className="ml-auto rounded-full bg-[var(--fresh)]/15 px-2 py-0.5 text-[10px] font-medium text-[var(--fresh)]">
-            LIVE
-          </span>
-        )}
+        <span className="font-mono text-xs font-medium text-[var(--text-muted)]">
+          · {icao}
+        </span>
+        <div className="ml-auto flex items-center gap-2">
+          {isLive && (
+            <span className="rounded-full bg-[var(--fresh)]/15 px-2 py-0.5 text-[10px] font-medium text-[var(--fresh)]">
+              LIVE
+            </span>
+          )}
+          <UtcClock />
+        </div>
       </header>
 
       {/* Warning banner */}
@@ -194,7 +223,12 @@ export default function AtisPage() {
       {/* Airport header */}
       <AirportHeader airport={data.airport} />
 
-      <main className="flex flex-1 flex-col gap-5 pb-4">
+      {/* Sunrise / Sunset */}
+      {data.airport.lat != null && data.airport.lon != null && (
+        <SunTimes lat={data.airport.lat} lon={data.airport.lon} />
+      )}
+
+      <main className="flex flex-1 flex-col gap-5 pt-2 pb-4">
         {/* ATIS Cards — one per message (ARR + DEP) */}
         {hasAtis ? (
           data.atis.map((atis, i) => (
@@ -219,11 +253,6 @@ export default function AtisPage() {
           </div>
         )}
 
-        {/* Meteogram */}
-        {data.airport.lat != null && data.airport.lon != null && (
-          <Meteogram lat={data.airport.lat} lon={data.airport.lon} />
-        )}
-
         {/* METAR */}
         {data.metar && (
           <WeatherBlock
@@ -246,6 +275,11 @@ export default function AtisPage() {
             mode={weatherMode}
             onToggle={toggleWeatherMode}
           />
+        )}
+
+        {/* Meteogram */}
+        {data.airport.lat != null && data.airport.lon != null && (
+          <Meteogram lat={data.airport.lat} lon={data.airport.lon} />
         )}
 
         {/* NOTAMs */}
