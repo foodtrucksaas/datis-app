@@ -72,17 +72,10 @@ export function NotamBlock({ icao }: NotamBlockProps) {
 
   if (loading || notams.length === 0) return null;
 
-  const highCount = notams.filter((n) => n.severity === "high").length;
-
   return (
     <div className="mx-5">
       <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
-        NOTAMs actifs
-        {highCount > 0 && (
-          <span className="ml-2 rounded-full bg-red-500/15 px-1.5 py-0.5 text-[10px] font-bold text-red-500">
-            {highCount}
-          </span>
-        )}
+        NOTAMs
       </h3>
       <div className="space-y-1.5">
         {notams.map((n) => {

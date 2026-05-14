@@ -219,9 +219,6 @@ export default function AtisPage() {
           </div>
         )}
 
-        {/* NOTAMs */}
-        <NotamBlock icao={icao} />
-
         {/* Meteogram */}
         {data.airport.lat != null && data.airport.lon != null && (
           <Meteogram lat={data.airport.lat} lon={data.airport.lon} />
@@ -250,6 +247,9 @@ export default function AtisPage() {
             onToggle={toggleWeatherMode}
           />
         )}
+
+        {/* NOTAMs */}
+        <NotamBlock icao={icao} />
       </main>
 
       <PageFooter onRefresh={handleRefresh} />
