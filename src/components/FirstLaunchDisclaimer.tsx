@@ -64,7 +64,7 @@ export function FirstLaunchDisclaimer({
         <div className="mt-6">
           <button
             onClick={handleAccept}
-            className="w-full rounded-md bg-sky-500 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-sky-400"
+            className="w-full rounded-md bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-dim)]"
           >
             J&apos;ai compris et j&apos;accepte
           </button>

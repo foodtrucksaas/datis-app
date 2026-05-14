@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Plane } from "lucide-react";
 import { UtcClock } from "@/components/UtcClock";
+import { Wordmark } from "@/components/Wordmark";
 import {
   getSettings,
   updateSettings,
@@ -117,9 +118,7 @@ export default function AtisPage() {
           <Link href="/" className="p-1 -ml-1 text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors">
             <ArrowLeft className="h-5 w-5" />
           </Link>
-          <span className="font-mono text-base font-semibold tracking-wide text-[var(--accent)]">
-            ATIS·EU
-          </span>
+          <Wordmark size="sm" />
           <span className="font-mono text-xs font-medium text-[var(--text-muted)]">
             · {icao}
           </span>
@@ -160,9 +159,7 @@ export default function AtisPage() {
           <Link href="/" className="text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors">
             <ArrowLeft className="h-5 w-5" />
           </Link>
-          <span className="font-mono text-base font-semibold tracking-wide text-[var(--accent)]">
-            ATIS·EU
-          </span>
+          <Wordmark size="sm" />
         </header>
         <main className="flex flex-1 flex-col items-center justify-center gap-4 px-5 pb-16 text-center">
           <Plane className="h-10 w-10 text-[var(--text-muted)]" />

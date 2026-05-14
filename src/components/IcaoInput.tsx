@@ -113,7 +113,7 @@ export function IcaoInput({ variant = "light" }: IcaoInputProps) {
             placeholder:text-sm placeholder:tracking-normal
             focus:outline-none focus:ring-1 ${
               isDark
-                ? "border border-white/15 bg-white/8 text-white placeholder:text-white/30 backdrop-blur-md focus:border-sky-400/50 focus:ring-sky-400/30"
+                ? "border border-white/15 bg-white/8 text-white placeholder:text-white/30 backdrop-blur-md focus:border-amber-500/50 focus:ring-amber-500/30"
                 : "border border-[var(--border)] bg-[var(--surface)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent-dim)] focus:ring-[var(--accent-dim)]"
             }`}
         />
@@ -123,7 +123,7 @@ export function IcaoInput({ variant = "light" }: IcaoInputProps) {
           </span>
         )}
         {query.length === 4 && (
-          <span className={`absolute right-3.5 top-1/2 -translate-y-1/2 font-mono text-xs ${isDark ? "text-sky-400" : "text-[var(--fresh)]"}`}>
+          <span className={`absolute right-3.5 top-1/2 -translate-y-1/2 font-mono text-xs ${isDark ? "text-amber-500" : "text-[var(--fresh)]"}`}>
             ↵
           </span>
         )}
@@ -152,7 +152,7 @@ export function IcaoInput({ variant = "light" }: IcaoInputProps) {
                     : "text-[var(--text-secondary)] hover:bg-[var(--surface)]"
                 }`}
             >
-              <span className={`shrink-0 font-mono text-sm font-semibold ${isDark ? "text-sky-400" : "text-[var(--accent)]"}`}>
+              <span className={`shrink-0 font-mono text-sm font-semibold ${isDark ? "text-amber-500" : "text-[var(--accent)]"}`}>
                 {airport.icao}
               </span>
               <span className="truncate">

@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { FirstLaunchDisclaimer } from "@/components/FirstLaunchDisclaimer";
 import { IcaoInput } from "@/components/IcaoInput";
 import { getFavorites, getRecents } from "@/lib/store";
+import { Wordmark } from "@/components/Wordmark";
 import Link from "next/link";
 
 const AirportMap = dynamic(() => import("@/components/AirportMap"), {
@@ -31,17 +32,13 @@ export default function Home() {
 
         {/* Top bar: logo + clock */}
         <header className="flex items-center justify-between px-5 py-3">
-          <span className="font-mono text-base font-semibold tracking-wide text-sky-400">
-            ATIS·EU
-          </span>
+          <Wordmark size="sm" />
           <UtcClockInline />
         </header>
 
         {/* Search section */}
         <div className="flex flex-col items-center gap-4 px-5 pb-4">
-          <h1 className="text-xl font-bold tracking-tight text-white">
-            D-ATIS Europe
-          </h1>
+          <Wordmark size="lg" />
 
           <div className="w-full max-w-md">
             <IcaoInput variant="dark" />
